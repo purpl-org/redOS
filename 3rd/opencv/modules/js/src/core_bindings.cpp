@@ -68,21 +68,56 @@
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //M*/
 
-#include "opencv2/core.hpp"
-#include "opencv2/imgproc.hpp"
-#include "opencv2/video/tracking.hpp"
-#include "opencv2/video/background_segm.hpp"
-#include "opencv2/objdetect.hpp"
-#include "opencv2/dnn.hpp"
-
 #include <emscripten/bind.h>
+
+@INCLUDES@
+#include "../../../modules/core/src/parallel_impl.hpp"
+
+#ifdef TEST_WASM_INTRIN
+#include "../../../modules/core/include/opencv2/core/hal/intrin.hpp"
+#include "../../../modules/core/include/opencv2/core/utils/trace.hpp"
+#include "../../../modules/ts/include/opencv2/ts/ts_gtest.h"
+namespace cv {
+namespace hal {
+#include "../../../modules/core/test/test_intrin_utils.hpp"
+}
+}
+#endif
 
 using namespace emscripten;
 using namespace cv;
-using namespace dnn;
+
+using namespace cv::segmentation;  // FIXIT
+
+#ifdef HAVE_OPENCV_OBJDETECT
+using namespace cv::aruco;
+typedef aruco::DetectorParameters aruco_DetectorParameters;
+typedef QRCodeDetectorAruco::Params QRCodeDetectorAruco_Params;
+#endif
+
+#ifdef HAVE_OPENCV_DNN
+using namespace cv::dnn;
+#endif
+
+#ifdef HAVE_OPENCV_FEATURES2D
+typedef SimpleBlobDetector::Params SimpleBlobDetector_Params;
+#endif
+
+#ifdef HAVE_OPENCV_VIDEO
+typedef TrackerMIL::Params TrackerMIL_Params;
+#endif
+
+// HACK: JS generator ommits namespace for parameter types for some reason. Added typedef to handle std::string correctly
+typedef std::string string;
 
 namespace binding_utils
 {
+    template<typename classT, typename enumT>
+    static inline typename std::underlying_type<enumT>::type classT::* underlying_ptr(enumT classT::* enum_ptr)
+    {
+        return reinterpret_cast<typename std::underlying_type<enumT>::type classT::*>(enum_ptr);
+    }
+
     template<typename T>
     emscripten::val matData(const cv::Mat& mat)
     {
@@ -281,6 +316,7 @@ namespace binding_utils
         float radius;
     };
 
+#ifdef HAVE_OPENCV_IMGPROC
     Circle minEnclosingCircle(const cv::Mat& points)
     {
         Circle circle;
@@ -288,6 +324,42 @@ namespace binding_utils
         return circle;
     }
 
+    int floodFill_withRect_helper(cv::Mat& arg1, cv::Mat& arg2, Point arg3, Scalar arg4, emscripten::val arg5, Scalar arg6 = Scalar(), Scalar arg7 = Scalar(), int arg8 = 4)
+    {
+        cv::Rect rect;
+
+        int rc = cv::floodFill(arg1, arg2, arg3, arg4, &rect, arg6, arg7, arg8);
+
+        arg5.set("x", emscripten::val(rect.x));
+        arg5.set("y", emscripten::val(rect.y));
+        arg5.set("width", emscripten::val(rect.width));
+        arg5.set("height", emscripten::val(rect.height));
+
+        return rc;
+    }
+
+    int floodFill_wrapper(cv::Mat& arg1, cv::Mat& arg2, Point arg3, Scalar arg4, emscripten::val arg5, Scalar arg6, Scalar arg7, int arg8) {
+        return floodFill_withRect_helper(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+    }
+
+    int floodFill_wrapper_1(cv::Mat& arg1, cv::Mat& arg2, Point arg3, Scalar arg4, emscripten::val arg5, Scalar arg6, Scalar arg7) {
+        return floodFill_withRect_helper(arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+    }
+
+    int floodFill_wrapper_2(cv::Mat& arg1, cv::Mat& arg2, Point arg3, Scalar arg4, emscripten::val arg5, Scalar arg6) {
+        return floodFill_withRect_helper(arg1, arg2, arg3, arg4, arg5, arg6);
+    }
+
+    int floodFill_wrapper_3(cv::Mat& arg1, cv::Mat& arg2, Point arg3, Scalar arg4, emscripten::val arg5) {
+        return floodFill_withRect_helper(arg1, arg2, arg3, arg4, arg5);
+    }
+
+    int floodFill_wrapper_4(cv::Mat& arg1, cv::Mat& arg2, Point arg3, Scalar arg4) {
+        return cv::floodFill(arg1, arg2, arg3, arg4);
+    }
+#endif
+
+#ifdef HAVE_OPENCV_VIDEO
     emscripten::val CamShiftWrapper(const cv::Mat& arg1, Rect& arg2, TermCriteria arg3)
     {
         RotatedRect rotatedRect = cv::CamShift(arg1, arg2, arg3);
@@ -306,6 +378,23 @@ namespace binding_utils
         return result;
     }
 
+    void Tracker_init_wrapper(cv::Tracker& arg0, const cv::Mat& arg1, const Rect& arg2)
+    {
+        return arg0.init(arg1, arg2);
+    }
+
+    emscripten::val Tracker_update_wrapper(cv::Tracker& arg0, const cv::Mat& arg1)
+    {
+        Rect rect;
+        bool update = arg0.update(arg1, rect);
+
+        emscripten::val result = emscripten::val::array();
+        result.call<void>("push", update);
+        result.call<void>("push", rect);
+        return result;
+    }
+#endif  // HAVE_OPENCV_VIDEO
+
     std::string getExceptionMsg(const cv::Exception& e) {
         return e.msg;
     }
@@ -322,16 +411,72 @@ namespace binding_utils
     std::string getBuildInformation() {
         return cv::getBuildInformation();
     }
+
+#ifdef TEST_WASM_INTRIN
+    void test_hal_intrin_uint8() {
+        cv::hal::test_hal_intrin_uint8();
+    }
+    void test_hal_intrin_int8() {
+        cv::hal::test_hal_intrin_int8();
+    }
+    void test_hal_intrin_uint16() {
+        cv::hal::test_hal_intrin_uint16();
+    }
+    void test_hal_intrin_int16() {
+        cv::hal::test_hal_intrin_int16();
+    }
+    void test_hal_intrin_uint32() {
+        cv::hal::test_hal_intrin_uint32();
+    }
+    void test_hal_intrin_int32() {
+        cv::hal::test_hal_intrin_int32();
+    }
+    void test_hal_intrin_uint64() {
+        cv::hal::test_hal_intrin_uint64();
+    }
+    void test_hal_intrin_int64() {
+        cv::hal::test_hal_intrin_int64();
+    }
+    void test_hal_intrin_float32() {
+        cv::hal::test_hal_intrin_float32();
+    }
+    void test_hal_intrin_float64() {
+        cv::hal::test_hal_intrin_float64();
+    }
+    void test_hal_intrin_all() {
+        cv::hal::test_hal_intrin_uint8();
+        cv::hal::test_hal_intrin_int8();
+        cv::hal::test_hal_intrin_uint16();
+        cv::hal::test_hal_intrin_int16();
+        cv::hal::test_hal_intrin_uint32();
+        cv::hal::test_hal_intrin_int32();
+        cv::hal::test_hal_intrin_uint64();
+        cv::hal::test_hal_intrin_int64();
+        cv::hal::test_hal_intrin_float32();
+        cv::hal::test_hal_intrin_float64();
+    }
+#endif
 }
 
 EMSCRIPTEN_BINDINGS(binding_utils)
 {
     register_vector<int>("IntVector");
+    register_vector<char>("CharVector");
     register_vector<float>("FloatVector");
     register_vector<double>("DoubleVector");
+    register_vector<std::string>("StringVector");
     register_vector<cv::Point>("PointVector");
+    register_vector<cv::Point2f>("Point2fVector");
+    register_vector<cv::Point3_<float>>("Point3fVector");
     register_vector<cv::Mat>("MatVector");
     register_vector<cv::Rect>("RectVector");
+    register_vector<cv::KeyPoint>("KeyPointVector");
+    register_vector<cv::DMatch>("DMatchVector");
+    register_vector<std::vector<char>>("CharVectorVector");
+    register_vector<std::vector<cv::DMatch>>("DMatchVectorVector");
+    register_vector<std::vector<cv::KeyPoint>>("KeyPointVectorVector");
+    register_vector<std::vector<cv::Point>>("PointVectorVector");
+
 
     emscripten::class_<cv::Mat>("Mat")
         .constructor<>()
@@ -379,7 +524,7 @@ EMSCRIPTEN_BINDINGS(binding_utils)
         .function("colRange", select_overload<Mat(int, int)const>(&cv::Mat::colRange))
         .function("colRange", select_overload<Mat(const Range&)const>(&cv::Mat::colRange))
         .function("step1", select_overload<size_t(int)const>(&cv::Mat::step1))
-        .function("clone", select_overload<Mat()const>(&cv::Mat::clone))
+        .function("mat_clone", select_overload<Mat()const>(&cv::Mat::clone))
         .function("depth", select_overload<int()const>(&cv::Mat::depth))
         .function("col", select_overload<Mat(int)const>(&cv::Mat::col))
         .function("dot", select_overload<double(const Mat&, const Mat&)>(&binding_utils::matDot))
@@ -443,7 +588,7 @@ EMSCRIPTEN_BINDINGS(binding_utils)
         .field("epsilon", &cv::TermCriteria::epsilon);
 
 #define EMSCRIPTEN_CV_SIZE(type) \
-    emscripten::value_object<type>("#type") \
+    emscripten::value_object<type>(#type) \
         .field("width", &type::width) \
         .field("height", &type::height);
 
@@ -451,12 +596,13 @@ EMSCRIPTEN_BINDINGS(binding_utils)
     EMSCRIPTEN_CV_SIZE(Size2f)
 
 #define EMSCRIPTEN_CV_POINT(type) \
-    emscripten::value_object<type>("#type") \
+    emscripten::value_object<type>(#type) \
         .field("x", &type::x) \
         .field("y", &type::y); \
 
     EMSCRIPTEN_CV_POINT(Point)
     EMSCRIPTEN_CV_POINT(Point2f)
+    EMSCRIPTEN_CV_POINT(Point3f)
 
 #define EMSCRIPTEN_CV_RECT(type, name) \
     emscripten::value_object<cv::Rect_<type>> (name) \
@@ -467,21 +613,32 @@ EMSCRIPTEN_BINDINGS(binding_utils)
 
     EMSCRIPTEN_CV_RECT(int, "Rect")
     EMSCRIPTEN_CV_RECT(float, "Rect2f")
+    EMSCRIPTEN_CV_RECT(double, "Rect2d")
 
     emscripten::value_object<cv::RotatedRect>("RotatedRect")
         .field("center", &cv::RotatedRect::center)
         .field("size", &cv::RotatedRect::size)
         .field("angle", &cv::RotatedRect::angle);
 
-    function("rotatedRectPoints", select_overload<emscripten::val(const cv::RotatedRect&)>(&binding_utils::rotatedRectPoints));
-    function("rotatedRectBoundingRect", select_overload<Rect(const cv::RotatedRect&)>(&binding_utils::rotatedRectBoundingRect));
-    function("rotatedRectBoundingRect2f", select_overload<Rect2f(const cv::RotatedRect&)>(&binding_utils::rotatedRectBoundingRect2f));
+    emscripten::value_object<cv::KeyPoint>("KeyPoint")
+        .field("angle", &cv::KeyPoint::angle)
+        .field("class_id", &cv::KeyPoint::class_id)
+        .field("octave", &cv::KeyPoint::octave)
+        .field("pt", &cv::KeyPoint::pt)
+        .field("response", &cv::KeyPoint::response)
+        .field("size", &cv::KeyPoint::size);
+
+    emscripten::value_object<cv::DMatch>("DMatch")
+        .field("queryIdx", &cv::DMatch::queryIdx)
+        .field("trainIdx", &cv::DMatch::trainIdx)
+        .field("imgIdx", &cv::DMatch::imgIdx)
+        .field("distance", &cv::DMatch::distance);
 
     emscripten::value_array<cv::Scalar_<double>> ("Scalar")
-        .element(index<0>())
-        .element(index<1>())
-        .element(index<2>())
-        .element(index<3>());
+        .element(emscripten::index<0>())
+        .element(emscripten::index<1>())
+        .element(emscripten::index<2>())
+        .element(emscripten::index<3>());
 
     emscripten::value_object<binding_utils::MinMaxLoc>("MinMaxLoc")
         .field("minVal", &binding_utils::MinMaxLoc::minVal)
@@ -489,10 +646,25 @@ EMSCRIPTEN_BINDINGS(binding_utils)
         .field("minLoc", &binding_utils::MinMaxLoc::minLoc)
         .field("maxLoc", &binding_utils::MinMaxLoc::maxLoc);
 
+    emscripten::value_object<cv::Exception>("Exception")
+        .field("code", &cv::Exception::code)
+        .field("msg", &binding_utils::getExceptionMsg, &binding_utils::setExceptionMsg);
+
     emscripten::value_object<binding_utils::Circle>("Circle")
         .field("center", &binding_utils::Circle::center)
         .field("radius", &binding_utils::Circle::radius);
 
+    function("boxPoints", select_overload<emscripten::val(const cv::RotatedRect&)>(&binding_utils::rotatedRectPoints));
+    function("rotatedRectPoints", select_overload<emscripten::val(const cv::RotatedRect&)>(&binding_utils::rotatedRectPoints));
+    function("rotatedRectBoundingRect", select_overload<Rect(const cv::RotatedRect&)>(&binding_utils::rotatedRectBoundingRect));
+    function("rotatedRectBoundingRect2f", select_overload<Rect2f(const cv::RotatedRect&)>(&binding_utils::rotatedRectBoundingRect2f));
+    function("exceptionFromPtr", &binding_utils::exceptionFromPtr, allow_raw_pointers());
+    function("minMaxLoc", select_overload<binding_utils::MinMaxLoc(const cv::Mat&, const cv::Mat&)>(&binding_utils::minMaxLoc));
+    function("minMaxLoc", select_overload<binding_utils::MinMaxLoc(const cv::Mat&)>(&binding_utils::minMaxLoc_1));
+    function("CV_MAT_DEPTH", &binding_utils::cvMatDepth);
+    function("getBuildInformation", &binding_utils::getBuildInformation);
+
+#ifdef HAVE_OPENCV_IMGPROC
     emscripten::value_object<cv::Moments >("Moments")
         .field("m00", &cv::Moments::m00)
         .field("m10", &cv::Moments::m10)
@@ -519,27 +691,42 @@ EMSCRIPTEN_BINDINGS(binding_utils)
         .field("nu12", &cv::Moments::nu12)
         .field("nu03", &cv::Moments::nu03);
 
-    emscripten::value_object<cv::Exception>("Exception")
-        .field("code", &cv::Exception::code)
-        .field("msg", &binding_utils::getExceptionMsg, &binding_utils::setExceptionMsg);
-
-    function("exceptionFromPtr", &binding_utils::exceptionFromPtr, allow_raw_pointers());
-
     function("minEnclosingCircle", select_overload<binding_utils::Circle(const cv::Mat&)>(&binding_utils::minEnclosingCircle));
-
-    function("minMaxLoc", select_overload<binding_utils::MinMaxLoc(const cv::Mat&, const cv::Mat&)>(&binding_utils::minMaxLoc));
-
-    function("minMaxLoc", select_overload<binding_utils::MinMaxLoc(const cv::Mat&)>(&binding_utils::minMaxLoc_1));
-
+    function("floodFill", select_overload<int(cv::Mat&, cv::Mat&, Point, Scalar, emscripten::val, Scalar, Scalar, int)>(&binding_utils::floodFill_wrapper));
+    function("floodFill", select_overload<int(cv::Mat&, cv::Mat&, Point, Scalar, emscripten::val, Scalar, Scalar)>(&binding_utils::floodFill_wrapper_1));
+    function("floodFill", select_overload<int(cv::Mat&, cv::Mat&, Point, Scalar, emscripten::val, Scalar)>(&binding_utils::floodFill_wrapper_2));
+    function("floodFill", select_overload<int(cv::Mat&, cv::Mat&, Point, Scalar, emscripten::val)>(&binding_utils::floodFill_wrapper_3));
+    function("floodFill", select_overload<int(cv::Mat&, cv::Mat&, Point, Scalar)>(&binding_utils::floodFill_wrapper_4));
     function("morphologyDefaultBorderValue", &cv::morphologyDefaultBorderValue);
+#endif
 
-    function("CV_MAT_DEPTH", &binding_utils::cvMatDepth);
-
+#ifdef HAVE_OPENCV_VIDEO
     function("CamShift", select_overload<emscripten::val(const cv::Mat&, Rect&, TermCriteria)>(&binding_utils::CamShiftWrapper));
-
     function("meanShift", select_overload<emscripten::val(const cv::Mat&, Rect&, TermCriteria)>(&binding_utils::meanShiftWrapper));
 
-    function("getBuildInformation", &binding_utils::getBuildInformation);
+    emscripten::class_<cv::Tracker >("Tracker")
+        .function("init", select_overload<void(cv::Tracker&,const cv::Mat&,const Rect&)>(&binding_utils::Tracker_init_wrapper), pure_virtual())
+        .function("update", select_overload<emscripten::val(cv::Tracker&,const cv::Mat&)>(&binding_utils::Tracker_update_wrapper), pure_virtual());
+#endif
+
+#ifdef HAVE_PTHREADS_PF
+    function("parallel_pthreads_set_threads_num", &cv::parallel_pthreads_set_threads_num);
+    function("parallel_pthreads_get_threads_num", &cv::parallel_pthreads_get_threads_num);
+#endif
+
+#ifdef TEST_WASM_INTRIN
+    function("test_hal_intrin_uint8", &binding_utils::test_hal_intrin_uint8);
+    function("test_hal_intrin_int8", &binding_utils::test_hal_intrin_int8);
+    function("test_hal_intrin_uint16", &binding_utils::test_hal_intrin_uint16);
+    function("test_hal_intrin_int16", &binding_utils::test_hal_intrin_int16);
+    function("test_hal_intrin_uint32", &binding_utils::test_hal_intrin_uint32);
+    function("test_hal_intrin_int32", &binding_utils::test_hal_intrin_int32);
+    function("test_hal_intrin_uint64", &binding_utils::test_hal_intrin_uint64);
+    function("test_hal_intrin_int64", &binding_utils::test_hal_intrin_int64);
+    function("test_hal_intrin_float32", &binding_utils::test_hal_intrin_float32);
+    function("test_hal_intrin_float64", &binding_utils::test_hal_intrin_float64);
+    function("test_hal_intrin_all", &binding_utils::test_hal_intrin_all);
+#endif
 
     constant("CV_8UC1", CV_8UC1);
     constant("CV_8UC2", CV_8UC2);

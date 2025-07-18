@@ -50,7 +50,7 @@ namespace cv
 namespace opt_AVX2
 {
 
-class FAST_t_patternSize16_AVX2_Impl: public FAST_t_patternSize16_AVX2
+class FAST_t_patternSize16_AVX2_Impl CV_FINAL: public FAST_t_patternSize16_AVX2
 {
 public:
     FAST_t_patternSize16_AVX2_Impl(int _cols, int _threshold, bool _nonmax_suppression, const int* _pixel):
@@ -61,7 +61,7 @@ public:
         threshold = std::min(std::max(_threshold, 0), 255);
     }
 
-    virtual void process(int &j, const uchar* &ptr, uchar* curr, int* cornerpos, int &ncorners)
+    virtual void process(int &j, const uchar* &ptr, uchar* curr, int* cornerpos, int &ncorners) CV_OVERRIDE
     {
         static const __m256i delta256 = _mm256_broadcastsi128_si256(_mm_set1_epi8((char)(-128))), K16_256 = _mm256_broadcastsi128_si256(_mm_set1_epi8((char)8));
         const __m256i t256 = _mm256_broadcastsi128_si256(_mm_set1_epi8(t256c));
@@ -157,7 +157,7 @@ public:
                             q0 = v_max(q0, v_min(a, v0_));
                             q1 = v_min(q1, v_max(b, v0_));
                         }
-                        q0 = v_max(q0, v_setzero_s16() - q1);
+                        q0 = v_max(q0, v_sub(v_setzero_s16(), q1));
                         curr[j + k] = (uchar)(v_reduce_max(q0) - 1);
                     }
                 }
@@ -165,7 +165,7 @@ public:
         _mm256_zeroupper();
     }
 
-    virtual ~FAST_t_patternSize16_AVX2_Impl() {};
+    virtual ~FAST_t_patternSize16_AVX2_Impl() CV_OVERRIDE {}
 
 private:
     int cols;

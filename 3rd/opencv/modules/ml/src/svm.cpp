@@ -41,9 +41,11 @@
 //M*/
 
 #include "precomp.hpp"
+#include <opencv2/core/utils/logger.hpp>
 
 #include <stdarg.h>
 #include <ctype.h>
+
 
 /****************************************************************************************\
                                 COPYRIGHT NOTICE
@@ -52,7 +54,7 @@
   The code has been derived from libsvm library (version 2.6)
   (http://www.csie.ntu.edu.tw/~cjlin/libsvm).
 
-  Here is the orignal copyright:
+  Here is the original copyright:
 ------------------------------------------------------------------------------------------
     Copyright (c) 2000-2003 Chih-Chung Chang and Chih-Jen Lin
     All rights reserved.
@@ -95,11 +97,11 @@ const int QFLOAT_TYPE = DataDepth<Qfloat>::value;
 static void checkParamGrid(const ParamGrid& pg)
 {
     if( pg.minVal > pg.maxVal )
-        CV_Error( CV_StsBadArg, "Lower bound of the grid must be less then the upper one" );
+        CV_Error( cv::Error::StsBadArg, "Lower bound of the grid must be less then the upper one" );
     if( pg.minVal < DBL_EPSILON )
-        CV_Error( CV_StsBadArg, "Lower bound of the grid must be positive" );
+        CV_Error( cv::Error::StsBadArg, "Lower bound of the grid must be positive" );
     if( pg.logStep < 1. + FLT_EPSILON )
-        CV_Error( CV_StsBadArg, "Grid step must greater then 1" );
+        CV_Error( cv::Error::StsBadArg, "Grid step must greater than 1" );
 }
 
 // SVM training parameters
@@ -149,7 +151,7 @@ struct SvmParams
 };
 
 /////////////////////////////////////// SVM kernel ///////////////////////////////////////
-class SVMKernelImpl : public SVM::Kernel
+class SVMKernelImpl CV_FINAL : public SVM::Kernel
 {
 public:
     SVMKernelImpl( const SvmParams& _params = SvmParams() )
@@ -157,7 +159,7 @@ public:
         params = _params;
     }
 
-    int getType() const
+    int getType() const CV_OVERRIDE
     {
         return params.kernelType;
     }
@@ -200,19 +202,21 @@ public:
     {
         int j;
         calc_non_rbf_base( vcount, var_count, vecs, another, results,
-                          -2*params.gamma, -2*params.coef0 );
+                          2*params.gamma, 2*params.coef0 );
         // TODO: speedup this
         for( j = 0; j < vcount; j++ )
         {
             Qfloat t = results[j];
-            Qfloat e = std::exp(-std::abs(t));
-            if( t > 0 )
-                results[j] = (Qfloat)((1. - e)/(1. + e));
-            else
-                results[j] = (Qfloat)((e - 1.)/(e + 1.));
+            Qfloat e = std::exp(std::abs(t));          // Inf value is possible here
+            Qfloat r = (Qfloat)((e - 1.) / (e + 1.));  // NaN value is possible here (Inf/Inf or similar)
+            if (cvIsNaN(r))
+                r = std::numeric_limits<Qfloat>::infinity();
+            if (t < 0)
+                r = -r;
+            CV_DbgAssert(!cvIsNaN(r));
+            results[j] = r;
         }
     }
-
 
     void calc_rbf( int vcount, int var_count, const float* vecs,
                    const float* another, Qfloat* results )
@@ -287,7 +291,7 @@ public:
                 double d = sample[k]-another[k];
                 double devisor = sample[k]+another[k];
                 /// if devisor == 0, the Chi2 distance would be zero,
-                // but calculation would rise an error because of deviding by zero
+                // but calculation would rise an error because of dividing by zero
                 if (devisor != 0)
                 {
                     chi2 += d*d/devisor;
@@ -300,7 +304,7 @@ public:
     }
 
     void calc( int vcount, int var_count, const float* vecs,
-               const float* another, Qfloat* results )
+               const float* another, Qfloat* results ) CV_OVERRIDE
     {
         switch( params.kernelType )
         {
@@ -323,12 +327,12 @@ public:
             calc_intersec(vcount, var_count, vecs, another, results);
             break;
         default:
-            CV_Error(CV_StsBadArg, "Unknown kernel type");
+            CV_Error(cv::Error::StsBadArg, "Unknown kernel type");
         }
         const Qfloat max_val = (Qfloat)(FLT_MAX*1e-3);
         for( int j = 0; j < vcount; j++ )
         {
-            if( results[j] > max_val )
+            if (!(results[j] <= max_val))  // handle NaNs too
                 results[j] = max_val;
         }
     }
@@ -408,13 +412,13 @@ ParamGrid SVM::getDefaultGrid( int param_id )
         grid.logStep = 7; // total iterations = 3
     }
     else
-        cvError( CV_StsBadArg, "SVM::getDefaultGrid", "Invalid type of parameter "
+        cvError( cv::Error::StsBadArg, "SVM::getDefaultGrid", "Invalid type of parameter "
                 "(use one of SVM::C, SVM::GAMMA et al.)", __FILE__, __LINE__ );
     return grid;
 }
 
 
-class SVMImpl : public SVM
+class SVMImpl CV_FINAL : public SVM
 {
 public:
     struct DecisionFunc
@@ -636,18 +640,12 @@ public:
         #undef is_lower_bound
         #define is_lower_bound(i) (alpha_status[i] < 0)
 
-        #undef is_free
-        #define is_free(i) (alpha_status[i] == 0)
-
         #undef get_C
         #define get_C(i) (C[y[i]>0])
 
         #undef update_alpha_status
         #define update_alpha_status(i) \
             alpha_status[i] = (schar)(alpha[i] >= get_C(i) ? 1 : alpha[i] <= 0 ? -1 : 0)
-
-        #undef reconstruct_gradient
-        #define reconstruct_gradient() /* empty for now */
 
         bool solve_generic( SolutionInfo& si )
         {
@@ -1241,7 +1239,7 @@ public:
         clear();
     }
 
-    void clear()
+    void clear() CV_OVERRIDE
     {
         decision_func.clear();
         df_alpha.clear();
@@ -1250,39 +1248,44 @@ public:
         uncompressed_sv.release();
     }
 
-    Mat getUncompressedSupportVectors_() const
+    Mat getUncompressedSupportVectors() const CV_OVERRIDE
     {
         return uncompressed_sv;
     }
 
-    Mat getSupportVectors() const
+    Mat getSupportVectors() const CV_OVERRIDE
     {
         return sv;
     }
 
-    CV_IMPL_PROPERTY(int, Type, params.svmType)
-    CV_IMPL_PROPERTY(double, Gamma, params.gamma)
-    CV_IMPL_PROPERTY(double, Coef0, params.coef0)
-    CV_IMPL_PROPERTY(double, Degree, params.degree)
-    CV_IMPL_PROPERTY(double, C, params.C)
-    CV_IMPL_PROPERTY(double, Nu, params.nu)
-    CV_IMPL_PROPERTY(double, P, params.p)
-    CV_IMPL_PROPERTY_S(cv::Mat, ClassWeights, params.classWeights)
-    CV_IMPL_PROPERTY_S(cv::TermCriteria, TermCriteria, params.termCrit)
+    inline int getType() const CV_OVERRIDE { return params.svmType; }
+    inline void setType(int val) CV_OVERRIDE { params.svmType = val; }
+    inline double getGamma() const CV_OVERRIDE { return params.gamma; }
+    inline void setGamma(double val) CV_OVERRIDE { params.gamma = val; }
+    inline double getCoef0() const CV_OVERRIDE { return params.coef0; }
+    inline void setCoef0(double val) CV_OVERRIDE { params.coef0 = val; }
+    inline double getDegree() const CV_OVERRIDE { return params.degree; }
+    inline void setDegree(double val) CV_OVERRIDE { params.degree = val; }
+    inline double getC() const CV_OVERRIDE { return params.C; }
+    inline void setC(double val) CV_OVERRIDE { params.C = val; }
+    inline double getNu() const CV_OVERRIDE { return params.nu; }
+    inline void setNu(double val) CV_OVERRIDE { params.nu = val; }
+    inline double getP() const CV_OVERRIDE { return params.p; }
+    inline void setP(double val) CV_OVERRIDE { params.p = val; }
+    inline cv::Mat getClassWeights() const CV_OVERRIDE { return params.classWeights; }
+    inline void setClassWeights(const cv::Mat& val) CV_OVERRIDE { params.classWeights = val; }
+    inline cv::TermCriteria getTermCriteria() const CV_OVERRIDE { return params.termCrit; }
+    inline void setTermCriteria(const cv::TermCriteria& val) CV_OVERRIDE { params.termCrit = val; }
 
-    int getKernelType() const
-    {
-        return params.kernelType;
-    }
-
-    void setKernel(int kernelType)
+    int getKernelType() const CV_OVERRIDE { return params.kernelType; }
+    void setKernel(int kernelType) CV_OVERRIDE
     {
         params.kernelType = kernelType;
         if (kernelType != CUSTOM)
             kernel = makePtr<SVMKernelImpl>(params);
     }
 
-    void setCustomKernel(const Ptr<Kernel> &_kernel)
+    void setCustomKernel(const Ptr<Kernel> &_kernel) CV_OVERRIDE
     {
         params.kernelType = CUSTOM;
         kernel = _kernel;
@@ -1296,29 +1299,27 @@ public:
             if( kernelType != LINEAR && kernelType != POLY &&
                 kernelType != SIGMOID && kernelType != RBF &&
                 kernelType != INTER && kernelType != CHI2)
-                CV_Error( CV_StsBadArg, "Unknown/unsupported kernel type" );
+                CV_Error( cv::Error::StsBadArg, "Unknown/unsupported kernel type" );
 
             if( kernelType == LINEAR )
                 params.gamma = 1;
             else if( params.gamma <= 0 )
-                CV_Error( CV_StsOutOfRange, "gamma parameter of the kernel must be positive" );
+                CV_Error( cv::Error::StsOutOfRange, "gamma parameter of the kernel must be positive" );
 
             if( kernelType != SIGMOID && kernelType != POLY )
                 params.coef0 = 0;
-            else if( params.coef0 < 0 )
-                CV_Error( CV_StsOutOfRange, "The kernel parameter <coef0> must be positive or zero" );
 
             if( kernelType != POLY )
                 params.degree = 0;
             else if( params.degree <= 0 )
-                CV_Error( CV_StsOutOfRange, "The kernel parameter <degree> must be positive" );
+                CV_Error( cv::Error::StsOutOfRange, "The kernel parameter <degree> must be positive" );
 
             kernel = makePtr<SVMKernelImpl>(params);
         }
         else
         {
             if (!kernel)
-                CV_Error( CV_StsBadArg, "Custom kernel is not set" );
+                CV_Error( cv::Error::StsBadArg, "Custom kernel is not set" );
         }
 
         int svmType = params.svmType;
@@ -1326,22 +1327,22 @@ public:
         if( svmType != C_SVC && svmType != NU_SVC &&
             svmType != ONE_CLASS && svmType != EPS_SVR &&
             svmType != NU_SVR )
-            CV_Error( CV_StsBadArg, "Unknown/unsupported SVM type" );
+            CV_Error( cv::Error::StsBadArg, "Unknown/unsupported SVM type" );
 
         if( svmType == ONE_CLASS || svmType == NU_SVC )
             params.C = 0;
         else if( params.C <= 0 )
-            CV_Error( CV_StsOutOfRange, "The parameter C must be positive" );
+            CV_Error( cv::Error::StsOutOfRange, "The parameter C must be positive" );
 
         if( svmType == C_SVC || svmType == EPS_SVR )
             params.nu = 0;
         else if( params.nu <= 0 || params.nu >= 1 )
-            CV_Error( CV_StsOutOfRange, "The parameter nu must be between 0 and 1" );
+            CV_Error( cv::Error::StsOutOfRange, "The parameter nu must be between 0 and 1" );
 
         if( svmType != EPS_SVR )
             params.p = 0;
         else if( params.p <= 0 )
-            CV_Error( CV_StsOutOfRange, "The parameter p must be positive" );
+            CV_Error( cv::Error::StsOutOfRange, "The parameter p must be positive" );
 
         if( svmType != C_SVC )
             params.classWeights.release();
@@ -1432,7 +1433,7 @@ public:
                 if( (cw.cols != 1 && cw.rows != 1) ||
                     (int)cw.total() != class_count ||
                     (cw.type() != CV_32F && cw.type() != CV_64F) )
-                    CV_Error( CV_StsBadArg, "params.class_weights must be 1d floating-point vector "
+                    CV_Error( cv::Error::StsBadArg, "params.class_weights must be 1d floating-point vector "
                         "containing as many elements as the number of classes" );
 
                 cw.convertTo(class_weights, CV_64F, params.C);
@@ -1446,8 +1447,8 @@ public:
             sortSamplesByClasses( _samples, _responses, sidx_all, class_ranges );
 
             //check that while cross-validation there were the samples from all the classes
-            if( class_ranges[class_count] <= 0 )
-                CV_Error( CV_StsBadArg, "While cross-validation one or more of the classes have "
+            if ((int)class_ranges.size() < class_count + 1)
+                CV_Error( cv::Error::StsBadArg, "While cross-validation one or more of the classes have "
                 "been fell out of the sample. Try to reduce <Params::k_fold>" );
 
             if( svmType == NU_SVC )
@@ -1459,9 +1460,10 @@ public:
                     for( j = i+1; j< class_count; j++ )
                     {
                         int cj = class_ranges[j+1] - class_ranges[j];
-                        if( nu*(ci + cj)*0.5 > std::min( ci, cj ) )
-                            // TODO: add some diagnostic
+                        if( nu*(ci + cj)*0.5 > std::min( ci, cj ) ) {
+                            CV_LOG_ERROR(NULL, "Training cases incompatible with nu parameter—try a lower value.");
                             return false;
+                        }
                     }
                 }
             }
@@ -1574,7 +1576,7 @@ public:
             return;
 
         AutoBuffer<double> vbuf(var_count);
-        double* v = vbuf;
+        double* v = vbuf.data();
         Mat new_sv(df_count, var_count, CV_32F);
 
         vector<DecisionFunc> new_df;
@@ -1606,8 +1608,9 @@ public:
         std::swap(decision_func, new_df);
     }
 
-    bool train( const Ptr<TrainData>& data, int )
+    bool train( const Ptr<TrainData>& data, int ) CV_OVERRIDE
     {
+        CV_Assert(!data.empty());
         clear();
 
         checkParams();
@@ -1620,7 +1623,7 @@ public:
         {
             responses = data->getTrainNormCatResponses();
             if( responses.empty() )
-                CV_Error(CV_StsBadArg, "in the case of classification problem the responses must be categorical; "
+                CV_Error(cv::Error::StsBadArg, "in the case of classification problem the responses must be categorical; "
                                        "either specify varType when creating TrainData, or pass integer responses");
             class_labels = data->getClassLabels();
         }
@@ -1651,7 +1654,7 @@ public:
         sidx(_sidx), is_classification(_is_classification), k_fold(_k_fold), result(_result)
         {}
 
-        void operator()( const cv::Range& range ) const
+        void operator()( const cv::Range& range ) const CV_OVERRIDE
         {
             int sample_count = samples.rows;
             int var_count_ = samples.cols;
@@ -1732,8 +1735,9 @@ public:
     bool trainAuto( const Ptr<TrainData>& data, int k_fold,
                     ParamGrid C_grid, ParamGrid gamma_grid, ParamGrid p_grid,
                     ParamGrid nu_grid, ParamGrid coef_grid, ParamGrid degree_grid,
-                    bool balanced )
+                    bool balanced ) CV_OVERRIDE
     {
+        CV_Assert(!data.empty());
         checkParams();
 
         int svmType = params.svmType;
@@ -1902,14 +1906,14 @@ public:
             returnDFVal = _returnDFVal;
         }
 
-        void operator()( const Range& range ) const
+        void operator()(const Range& range) const CV_OVERRIDE
         {
             int svmType = svm->params.svmType;
             int sv_total = svm->sv.rows;
             int class_count = !svm->class_labels.empty() ? (int)svm->class_labels.total() : svmType == ONE_CLASS ? 1 : 0;
 
             AutoBuffer<float> _buffer(sv_total + (class_count+1)*2);
-            float* buffer = _buffer;
+            float* buffer = _buffer.data();
 
             int i, j, dfi, k, si;
 
@@ -1947,6 +1951,7 @@ public:
                             const DecisionFunc& df = svm->decision_func[dfi];
                             sum = -df.rho;
                             int sv_count = svm->getSVCount(dfi);
+                            CV_DbgAssert(sv_count > 0);
                             const double* alpha = &svm->df_alpha[df.ofs];
                             const int* sv_index = &svm->df_index[df.ofs];
                             for( k = 0; k < sv_count; k++ )
@@ -1967,7 +1972,7 @@ public:
                 }
             }
             else
-                CV_Error( CV_StsBadArg, "INTERNAL ERROR: Unknown SVM type, "
+                CV_Error( cv::Error::StsBadArg, "INTERNAL ERROR: Unknown SVM type, "
                          "the SVM structure is probably corrupted" );
         }
 
@@ -1977,10 +1982,10 @@ public:
         bool returnDFVal;
     };
 
-    bool trainAuto_(InputArray samples, int layout,
+    bool trainAuto(InputArray samples, int layout,
             InputArray responses, int kfold, Ptr<ParamGrid> Cgrid,
             Ptr<ParamGrid> gammaGrid, Ptr<ParamGrid> pGrid, Ptr<ParamGrid> nuGrid,
-            Ptr<ParamGrid> coeffGrid, Ptr<ParamGrid> degreeGrid, bool balanced)
+            Ptr<ParamGrid> coeffGrid, Ptr<ParamGrid> degreeGrid, bool balanced) CV_OVERRIDE
     {
         Ptr<TrainData> data = TrainData::create(samples, layout, responses);
         return this->trainAuto(
@@ -1995,7 +2000,7 @@ public:
     }
 
 
-    float predict( InputArray _samples, OutputArray _results, int flags ) const
+    float predict( InputArray _samples, OutputArray _results, int flags ) const CV_OVERRIDE
     {
         float result = 0;
         Mat samples = _samples.getMat(), results;
@@ -2023,7 +2028,7 @@ public:
         return result;
     }
 
-    double getDecisionFunction(int i, OutputArray _alpha, OutputArray _svidx ) const
+    double getDecisionFunction(int i, OutputArray _alpha, OutputArray _svidx ) const CV_OVERRIDE
     {
         CV_Assert( 0 <= i && i < (int)decision_func.size());
         const DecisionFunc& df = decision_func[i];
@@ -2043,7 +2048,7 @@ public:
             svmType == NU_SVC ? "NU_SVC" :
             svmType == ONE_CLASS ? "ONE_CLASS" :
             svmType == EPS_SVR ? "EPS_SVR" :
-            svmType == NU_SVR ? "NU_SVR" : format("Uknown_%d", svmType);
+            svmType == NU_SVR ? "NU_SVR" : format("Unknown_%d", svmType);
         String kernel_type_str =
             kernelType == LINEAR ? "LINEAR" :
             kernelType == POLY ? "POLY" :
@@ -2085,32 +2090,32 @@ public:
         fs << "}";
     }
 
-    bool isTrained() const
+    bool isTrained() const CV_OVERRIDE
     {
         return !sv.empty();
     }
 
-    bool isClassifier() const
+    bool isClassifier() const CV_OVERRIDE
     {
         return params.svmType == C_SVC || params.svmType == NU_SVC || params.svmType == ONE_CLASS;
     }
 
-    int getVarCount() const
+    int getVarCount() const CV_OVERRIDE
     {
         return var_count;
     }
 
-    String getDefaultName() const
+    String getDefaultName() const CV_OVERRIDE
     {
         return "opencv_ml_svm";
     }
 
-    void write( FileStorage& fs ) const
+    void write( FileStorage& fs ) const CV_OVERRIDE
     {
         int class_count = !class_labels.empty() ? (int)class_labels.total() :
                           params.svmType == ONE_CLASS ? 1 : 0;
         if( !isTrained() )
-            CV_Error( CV_StsParseError, "SVM model data is invalid, check sv_count, var_* and class_count tags" );
+            CV_Error( cv::Error::StsParseError, "SVM model data is invalid, check sv_count, var_* and class_count tags" );
 
         writeFormat(fs);
         write_params( fs );
@@ -2195,11 +2200,11 @@ public:
             svm_type_str == "NU_SVR" ? NU_SVR : -1;
 
         if( svmType < 0 )
-            CV_Error( CV_StsParseError, "Missing or invalid SVM type" );
+            CV_Error( cv::Error::StsParseError, "Missing or invalid SVM type" );
 
         FileNode kernel_node = fn["kernel"];
         if( kernel_node.empty() )
-            CV_Error( CV_StsParseError, "SVM kernel tag is not found" );
+            CV_Error( cv::Error::StsParseError, "SVM kernel tag is not found" );
 
         String kernel_type_str = (String)kernel_node["type"];
         int kernelType =
@@ -2211,7 +2216,7 @@ public:
             kernel_type_str == "INTER" ? INTER : CUSTOM;
 
         if( kernelType == CUSTOM )
-            CV_Error( CV_StsParseError, "Invalid SVM kernel type (or custom kernel)" );
+            CV_Error( cv::Error::StsParseError, "Invalid SVM kernel type (or custom kernel)" );
 
         _params.svmType = svmType;
         _params.kernelType = kernelType;
@@ -2238,7 +2243,7 @@ public:
         setParams( _params );
     }
 
-    void read( const FileNode& fn )
+    void read( const FileNode& fn ) CV_OVERRIDE
     {
         clear();
 
@@ -2251,7 +2256,7 @@ public:
         int class_count = (int)fn["class_count"];
 
         if( sv_total <= 0 || var_count <= 0 )
-            CV_Error( CV_StsParseError, "SVM model data is invalid, check sv_count, var_* and class_count tags" );
+            CV_Error( cv::Error::StsParseError, "SVM model data is invalid, check sv_count, var_* and class_count tags" );
 
         FileNode m = fn["class_labels"];
         if( !m.empty() )
@@ -2261,7 +2266,7 @@ public:
             m >> params.classWeights;
 
         if( class_count > 1 && (class_labels.empty() || (int)class_labels.total() != class_count))
-            CV_Error( CV_StsParseError, "Array of class labels is missing or invalid" );
+            CV_Error( cv::Error::StsParseError, "Array of class labels is missing or invalid" );
 
         // read support vectors
         FileNode sv_node = fn["support_vectors"];
@@ -2348,26 +2353,6 @@ Ptr<SVM> SVM::load(const String& filepath)
     return svm;
 }
 
-Mat SVM::getUncompressedSupportVectors() const
-{
-    const SVMImpl* this_ = dynamic_cast<const SVMImpl*>(this);
-    if(!this_)
-        CV_Error(Error::StsNotImplemented, "the class is not SVMImpl");
-    return this_->getUncompressedSupportVectors_();
-}
-
-bool SVM::trainAuto(InputArray samples, int layout,
-            InputArray responses, int kfold, Ptr<ParamGrid> Cgrid,
-            Ptr<ParamGrid> gammaGrid, Ptr<ParamGrid> pGrid, Ptr<ParamGrid> nuGrid,
-            Ptr<ParamGrid> coeffGrid, Ptr<ParamGrid> degreeGrid, bool balanced)
-{
-  SVMImpl* this_ = dynamic_cast<SVMImpl*>(this);
-  if (!this_) {
-    CV_Error(Error::StsNotImplemented, "the class is not SVMImpl");
-  }
-  return this_->trainAuto_(samples, layout, responses,
-    kfold, Cgrid, gammaGrid, pGrid, nuGrid, coeffGrid, degreeGrid, balanced);
-}
 
 }
 }

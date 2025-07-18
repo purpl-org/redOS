@@ -49,8 +49,9 @@
 #define OPENCV_CALIB3D_UPNP_H_
 
 #include "precomp.hpp"
-#include "opencv2/core/core_c.h"
 #include <iostream>
+
+#if 0  // fix buffer overflow first (FIXIT mark in .cpp file)
 
 class upnp
 {
@@ -132,5 +133,7 @@ private:
       int max_nr;
       double * A1, * A2;
 };
+
+#endif
 
 #endif // OPENCV_CALIB3D_UPNP_H_

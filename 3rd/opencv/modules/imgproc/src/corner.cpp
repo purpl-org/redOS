@@ -56,9 +56,6 @@ static void calcMinEigenVal( const Mat& _cov, Mat& _dst )
 #if CV_TRY_AVX
     bool haveAvx = CV_CPU_HAS_SUPPORT_AVX;
 #endif
-#if CV_SIMD128
-    bool haveSimd = hasSIMD128();
-#endif
 
     if( _cov.isContinuous() && _dst.isContinuous() )
     {
@@ -77,22 +74,21 @@ static void calcMinEigenVal( const Mat& _cov, Mat& _dst )
 #endif // CV_TRY_AVX
             j = 0;
 
-#if CV_SIMD128
-        if( haveSimd )
+#if (CV_SIMD || CV_SIMD_SCALABLE)
         {
-            v_float32x4 half = v_setall_f32(0.5f);
-            for( ; j <= size.width - v_float32x4::nlanes; j += v_float32x4::nlanes )
+            v_float32 half = vx_setall_f32(0.5f);
+            for( ; j <= size.width - VTraits<v_float32>::vlanes(); j += VTraits<v_float32>::vlanes() )
             {
-                v_float32x4 v_a, v_b, v_c, v_t;
+                v_float32 v_a, v_b, v_c, v_t;
                 v_load_deinterleave(cov + j*3, v_a, v_b, v_c);
-                v_a *= half;
-                v_c *= half;
-                v_t = v_a - v_c;
-                v_t = v_muladd(v_b, v_b, (v_t * v_t));
-                v_store(dst + j, (v_a + v_c) - v_sqrt(v_t));
+                v_a = v_mul(v_a, half);
+                v_c = v_mul(v_c, half);
+                v_t = v_sub(v_a, v_c);
+                v_t = v_muladd(v_b, v_b, (v_mul(v_t, v_t)));
+                v_store(dst + j, v_sub(v_add(v_a, v_c), v_sqrt(v_t)));
             }
         }
-#endif // CV_SIMD128
+#endif // CV_SIMD
 
         for( ; j < size.width; j++ )
         {
@@ -111,9 +107,6 @@ static void calcHarris( const Mat& _cov, Mat& _dst, double k )
     Size size = _cov.size();
 #if CV_TRY_AVX
     bool haveAvx = CV_CPU_HAS_SUPPORT_AVX;
-#endif
-#if CV_SIMD128
-    bool haveSimd = hasSIMD128();
 #endif
 
     if( _cov.isContinuous() && _dst.isContinuous() )
@@ -134,19 +127,18 @@ static void calcHarris( const Mat& _cov, Mat& _dst, double k )
 #endif // CV_TRY_AVX
             j = 0;
 
-#if CV_SIMD128
-        if( haveSimd )
+#if (CV_SIMD || CV_SIMD_SCALABLE)
         {
-            v_float32x4 v_k = v_setall_f32((float)k);
+            v_float32 v_k = vx_setall_f32((float)k);
 
-            for( ; j <= size.width - v_float32x4::nlanes; j += v_float32x4::nlanes )
+            for( ; j <= size.width - VTraits<v_float32>::vlanes(); j += VTraits<v_float32>::vlanes() )
             {
-                v_float32x4 v_a, v_b, v_c;
+                v_float32 v_a, v_b, v_c;
                 v_load_deinterleave(cov + j * 3, v_a, v_b, v_c);
 
-                v_float32x4 v_ac_bb = v_a * v_c - v_b * v_b;
-                v_float32x4 v_ac = v_a + v_c;
-                v_float32x4 v_dst = v_ac_bb - v_k * v_ac * v_ac;
+                v_float32 v_ac_bb = v_sub(v_mul(v_a, v_c), v_mul(v_b, v_b));
+                v_float32 v_ac = v_add(v_a, v_c);
+                v_float32 v_dst = v_sub(v_ac_bb, v_mul(v_mul(v_k, v_ac), v_ac));
                 v_store(dst + j, v_dst);
             }
         }
@@ -247,15 +239,8 @@ cornerEigenValsVecs( const Mat& src, Mat& eigenv, int block_size,
                      int aperture_size, int op_type, double k=0.,
                      int borderType=BORDER_DEFAULT )
 {
-#ifdef HAVE_TEGRA_OPTIMIZATION
-    if (tegra::useTegra() && tegra::cornerEigenValsVecs(src, eigenv, block_size, aperture_size, op_type, k, borderType))
-        return;
-#endif
 #if CV_TRY_AVX
     bool haveAvx = CV_CPU_HAS_SUPPORT_AVX;
-#endif
-#if CV_SIMD128
-    bool haveSimd = hasSIMD128();
 #endif
 
     int depth = src.depth();
@@ -297,23 +282,22 @@ cornerEigenValsVecs( const Mat& src, Mat& eigenv, int block_size,
 #endif // CV_TRY_AVX
             j = 0;
 
-#if CV_SIMD128
-        if( haveSimd )
+#if (CV_SIMD || CV_SIMD_SCALABLE)
         {
-            for( ; j <= size.width - v_float32x4::nlanes; j += v_float32x4::nlanes )
+            for( ; j <= size.width - VTraits<v_float32>::vlanes(); j += VTraits<v_float32>::vlanes() )
             {
-                v_float32x4 v_dx = v_load(dxdata + j);
-                v_float32x4 v_dy = v_load(dydata + j);
+                v_float32 v_dx = vx_load(dxdata + j);
+                v_float32 v_dy = vx_load(dydata + j);
 
-                v_float32x4 v_dst0, v_dst1, v_dst2;
-                v_dst0 = v_dx * v_dx;
-                v_dst1 = v_dx * v_dy;
-                v_dst2 = v_dy * v_dy;
+                v_float32 v_dst0, v_dst1, v_dst2;
+                v_dst0 = v_mul(v_dx, v_dx);
+                v_dst1 = v_mul(v_dx, v_dy);
+                v_dst2 = v_mul(v_dy, v_dy);
 
                 v_store_interleave(cov_data + j * 3, v_dst0, v_dst1, v_dst2);
             }
         }
-#endif // CV_SIMD128
+#endif // CV_SIMD
 
         for( ; j < size.width; j++ )
         {
@@ -487,13 +471,13 @@ static bool ocl_preCornerDetect( InputArray _src, OutputArray _dst, int ksize, i
 
 }
 
-#if defined(HAVE_IPP)
+#if 0 //defined(HAVE_IPP)
 namespace cv
 {
 static bool ipp_cornerMinEigenVal( InputArray _src, OutputArray _dst, int blockSize, int ksize, int borderType )
 {
 #if IPP_VERSION_X100 >= 800
-    CV_INSTRUMENT_REGION_IPP()
+    CV_INSTRUMENT_REGION_IPP();
 
     Mat src = _src.getMat();
     _dst.create( src.size(), CV_32FC1 );
@@ -542,7 +526,7 @@ static bool ipp_cornerMinEigenVal( InputArray _src, OutputArray _dst, int blockS
                 if (ok >= 0)
                 {
                     AutoBuffer<uchar> buffer(bufferSize);
-                    ok = CV_INSTRUMENT_FUN_IPP(ippiMinEigenVal_C1R, src.ptr(), (int) src.step, dst.ptr<Ipp32f>(), (int) dst.step, srcRoi, kerType, kerSize, blockSize, buffer);
+                    ok = CV_INSTRUMENT_FUN_IPP(ippiMinEigenVal_C1R, src.ptr(), (int) src.step, dst.ptr<Ipp32f>(), (int) dst.step, srcRoi, kerType, kerSize, blockSize, buffer.data());
                     CV_SUPPRESS_DEPRECATED_START
                     if (ok >= 0) ok = CV_INSTRUMENT_FUN_IPP(ippiMulC_32f_C1IR, norm_coef, dst.ptr<Ipp32f>(), (int) dst.step, srcRoi);
                     CV_SUPPRESS_DEPRECATED_END
@@ -565,12 +549,12 @@ static bool ipp_cornerMinEigenVal( InputArray _src, OutputArray _dst, int blockS
 
 void cv::cornerMinEigenVal( InputArray _src, OutputArray _dst, int blockSize, int ksize, int borderType )
 {
-    CV_INSTRUMENT_REGION()
+    CV_INSTRUMENT_REGION();
 
     CV_OCL_RUN(_src.dims() <= 2 && _dst.isUMat(),
                ocl_cornerMinEigenValVecs(_src, _dst, blockSize, ksize, 0.0, borderType, MINEIGENVAL))
 
-#ifdef HAVE_IPP
+/*#ifdef HAVE_IPP
     int kerSize = (ksize < 0)?3:ksize;
     bool isolated = (borderType & BORDER_ISOLATED) != 0;
     int borderTypeNI = borderType & ~BORDER_ISOLATED;
@@ -578,7 +562,7 @@ void cv::cornerMinEigenVal( InputArray _src, OutputArray _dst, int blockSize, in
     CV_IPP_RUN(((borderTypeNI == BORDER_REPLICATE && (!_src.isSubmatrix() || isolated)) &&
             (kerSize == 3 || kerSize == 5) && (blockSize == 3 || blockSize == 5)) && IPP_VERSION_X100 >= 800,
         ipp_cornerMinEigenVal( _src, _dst, blockSize, ksize, borderType ));
-
+    */
 
     Mat src = _src.getMat();
     _dst.create( src.size(), CV_32FC1 );
@@ -594,7 +578,7 @@ namespace cv
 static bool ipp_cornerHarris( Mat &src, Mat &dst, int blockSize, int ksize, double k, int borderType )
 {
 #if IPP_VERSION_X100 >= 810
-    CV_INSTRUMENT_REGION_IPP()
+    CV_INSTRUMENT_REGION_IPP();
 
     {
         int type = src.type(), depth = CV_MAT_DEPTH(type), cn = CV_MAT_CN(type);
@@ -649,7 +633,7 @@ static bool ipp_cornerHarris( Mat &src, Mat &dst, int blockSize, int ksize, doub
 
 void cv::cornerHarris( InputArray _src, OutputArray _dst, int blockSize, int ksize, double k, int borderType )
 {
-    CV_INSTRUMENT_REGION()
+    CV_INSTRUMENT_REGION();
 
     CV_OCL_RUN(_src.dims() <= 2 && _dst.isUMat(),
                ocl_cornerMinEigenValVecs(_src, _dst, blockSize, ksize, k, borderType, HARRIS))
@@ -672,7 +656,7 @@ void cv::cornerHarris( InputArray _src, OutputArray _dst, int blockSize, int ksi
 
 void cv::cornerEigenValsAndVecs( InputArray _src, OutputArray _dst, int blockSize, int ksize, int borderType )
 {
-    CV_INSTRUMENT_REGION()
+    CV_INSTRUMENT_REGION();
 
     Mat src = _src.getMat();
     Size dsz = _dst.size();
@@ -687,7 +671,7 @@ void cv::cornerEigenValsAndVecs( InputArray _src, OutputArray _dst, int blockSiz
 
 void cv::preCornerDetect( InputArray _src, OutputArray _dst, int ksize, int borderType )
 {
-    CV_INSTRUMENT_REGION()
+    CV_INSTRUMENT_REGION();
 
     int type = _src.type();
     CV_Assert( type == CV_8UC1 || type == CV_32FC1 );
@@ -709,10 +693,9 @@ void cv::preCornerDetect( InputArray _src, OutputArray _dst, int ksize, int bord
     if( src.depth() == CV_8U )
         factor *= 255;
     factor = 1./(factor * factor * factor);
-#if CV_SIMD128
+#if (CV_SIMD || CV_SIMD_SCALABLE)
     float factor_f = (float)factor;
-    bool haveSimd = hasSIMD128();
-    v_float32x4 v_factor = v_setall_f32(factor_f), v_m2 = v_setall_f32(-2.0f);
+    v_float32 v_factor = vx_setall_f32(factor_f), v_m2 = vx_setall_f32(-2.0f);
 #endif
 
     Size size = src.size();
@@ -728,19 +711,18 @@ void cv::preCornerDetect( InputArray _src, OutputArray _dst, int ksize, int bord
 
         j = 0;
 
-#if CV_SIMD128
-        if (haveSimd)
+#if (CV_SIMD || CV_SIMD_SCALABLE)
         {
-            for( ; j <= size.width - v_float32x4::nlanes; j += v_float32x4::nlanes )
+            for( ; j <= size.width - VTraits<v_float32>::vlanes(); j += VTraits<v_float32>::vlanes() )
             {
-                v_float32x4 v_dx = v_load(dxdata + j);
-                v_float32x4 v_dy = v_load(dydata + j);
+                v_float32 v_dx = vx_load(dxdata + j);
+                v_float32 v_dy = vx_load(dydata + j);
 
-                v_float32x4 v_s1 = (v_dx * v_dx) * v_load(d2ydata + j);
-                v_float32x4 v_s2 = v_muladd((v_dy * v_dy),  v_load(d2xdata + j), v_s1);
-                v_float32x4 v_s3 = v_muladd((v_dy * v_dx) * v_load(dxydata + j), v_m2, v_s2);
+                v_float32 v_s1 = v_mul(v_mul(v_dx, v_dx), vx_load(d2ydata + j));
+                v_float32 v_s2 = v_muladd((v_mul(v_dy, v_dy)),  vx_load(d2xdata + j), v_s1);
+                v_float32 v_s3 = v_muladd(v_mul(v_mul(v_dy, v_dx), vx_load(dxydata + j)), v_m2, v_s2);
 
-                v_store(dstdata + j, v_s3 * v_factor);
+                v_store(dstdata + j, v_mul(v_s3, v_factor));
             }
         }
 #endif

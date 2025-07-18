@@ -66,10 +66,9 @@
 #endif
 
 // CHANGE THIS TO BE YOUR PROJECT'S STUFF
-const std::string OSProject = "redOS";
-const std::string OSBranch = "main";
-const std::string Creator = "By ekeleze/froggitti";
-const std::string CreatorWebsite = "ekeleze.net";
+const std::string OSProject = "WireOS";
+const std::string Creator = "By Wire/kercre123";
+const std::string CreatorWebsite = "kerigan.dev";
 
 // Log options
 #define LOG_CHANNEL    "FaceInfoScreenManager"
@@ -589,7 +588,7 @@ void FaceInfoScreenManager::SetScreen(ScreenName screen)
   _scratchDrawingImg->FillWith(0);
   DrawScratch();
 
-  LOG_INFO("FaceInfoScreenManager.SetScreen.EnteringScreen", "%hhu", GetCurrScreenName());
+  LOG_INFO("FaceInfoScreenManager.SetScreen.EnteringScreen", "%u", static_cast<uint8_t>(GetCurrScreenName()));
   _currScreen->EnterScreen();
 
   if(!IsAlexaScreen(GetCurrScreenName())) {
@@ -1471,7 +1470,7 @@ void FaceInfoScreenManager::DrawSensorInfo(const RobotState& state)
 void FaceInfoScreenManager::DrawBuildInfo() {
   auto *osstate = OSState::getInstance();
   const std::string osProject = "OS: " + OSProject;
-  const std::string branch = "BRANCH: " + OSBranch;
+  const std::string branch = "BRANCH: " + osstate->GetBuildBranch();
   const std::string osVer = "VER: " + osstate->GetOSBuildVersion();
   const std::string sha = "SHA: " + osstate->GetBuildSha();
   const std::string creator = Creator;
@@ -1675,7 +1674,7 @@ void FaceInfoScreenManager::DrawAlexaFace()
   {
     textLocationY += ( kTextSpacing * line.scale );
     _scratchDrawingImg->DrawTextCenteredHorizontally( line.text,
-                                                      CV_FONT_NORMAL,
+                                                      cv::QT_FONT_NORMAL,
                                                       kDefaultTextScale * line.scale,
                                                       kTextLineThickness,
                                                       kTextColor,

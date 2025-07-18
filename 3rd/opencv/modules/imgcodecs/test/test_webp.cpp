@@ -1,28 +1,16 @@
+// This file is part of OpenCV project.
+// It is subject to the license terms in the LICENSE file found in the top-level directory
+// of this distribution and at http://opencv.org/license.html.
+
 #include "test_precomp.hpp"
 
-using namespace cv;
-using namespace std;
-using namespace std::tr1;
+namespace opencv_test { namespace {
 
 #ifdef HAVE_WEBP
 
-TEST(Imgcodecs_WebP, encode_decode_lossless_webp)
+static void readFileBytes(const std::string& fname, std::vector<unsigned char>& buf)
 {
-    const string root = cvtest::TS::ptr()->get_data_path();
-    string filename = root + "../cv/shared/lena.png";
-    cv::Mat img = cv::imread(filename);
-    ASSERT_FALSE(img.empty());
-
-    string output = cv::tempfile(".webp");
-    EXPECT_NO_THROW(cv::imwrite(output, img)); // lossless
-
-    cv::Mat img_webp = cv::imread(output);
-
-    std::vector<unsigned char> buf;
-
-    FILE * wfile = NULL;
-
-    wfile = fopen(output.c_str(), "rb");
+    FILE * wfile = fopen(fname.c_str(), "rb");
     if (wfile != NULL)
     {
         fseek(wfile, 0, SEEK_END);
@@ -38,17 +26,35 @@ TEST(Imgcodecs_WebP, encode_decode_lossless_webp)
             fclose(wfile);
         }
 
-        if (data_size != wfile_size)
-        {
-            EXPECT_TRUE(false);
-        }
+        EXPECT_EQ(data_size, wfile_size);
     }
+}
 
+TEST(Imgcodecs_WebP, encode_decode_lossless_webp)
+{
+    const string root = cvtest::TS::ptr()->get_data_path();
+    string filename = root + "../cv/shared/lena.png";
+    cv::Mat img = cv::imread(filename);
+    ASSERT_FALSE(img.empty());
+
+    string output = cv::tempfile(".webp");
+    EXPECT_NO_THROW(cv::imwrite(output, img)); // lossless
+
+    cv::Mat img_webp = cv::imread(output);
+
+    std::vector<unsigned char> buf;
+    readFileBytes(output, buf);
     EXPECT_EQ(0, remove(output.c_str()));
 
     cv::Mat decode = cv::imdecode(buf, IMREAD_COLOR);
     ASSERT_FALSE(decode.empty());
     EXPECT_TRUE(cvtest::norm(decode, img_webp, NORM_INF) == 0);
+
+    cv::Mat decode_rgb = cv::imdecode(buf, IMREAD_COLOR_RGB);
+    ASSERT_FALSE(decode_rgb.empty());
+
+    cvtColor(decode_rgb, decode_rgb, COLOR_RGB2BGR);
+    EXPECT_TRUE(cvtest::norm(decode_rgb, img_webp, NORM_INF) == 0);
 
     ASSERT_FALSE(img_webp.empty());
 
@@ -95,12 +101,19 @@ TEST(Imgcodecs_WebP, encode_decode_with_alpha_webp)
     string output = cv::tempfile(".webp");
 
     EXPECT_NO_THROW(cv::imwrite(output, img));
-    cv::Mat img_webp = cv::imread(output);
+    cv::Mat img_webp = cv::imread(output, IMREAD_UNCHANGED);
+    cv::Mat img_webp_bgr = cv::imread(output); // IMREAD_COLOR by default
     EXPECT_EQ(0, remove(output.c_str()));
     EXPECT_FALSE(img_webp.empty());
     EXPECT_EQ(4,   img_webp.channels());
     EXPECT_EQ(512, img_webp.cols);
     EXPECT_EQ(512, img_webp.rows);
+    EXPECT_FALSE(img_webp_bgr.empty());
+    EXPECT_EQ(3,   img_webp_bgr.channels());
+    EXPECT_EQ(512, img_webp_bgr.cols);
+    EXPECT_EQ(512, img_webp_bgr.rows);
 }
 
 #endif // HAVE_WEBP
+
+}} // namespace

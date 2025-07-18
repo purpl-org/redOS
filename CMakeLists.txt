@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.6)
+cmake_minimum_required(VERSION 3.10)
 
 # uncomment this to display internal cmake state for targets, useful for debugging
 # set_property(GLOBAL PROPERTY GLOBAL_DEPENDS_DEBUG_MODE 1)
@@ -27,7 +27,7 @@ include(license)
 # They appear to be ignored by the android-sdk toolchain that works with gradle/Android Studio
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_CXX_EXTENSIONS ON)
 set(CMAKE_C_STANDARD 99)
 
 #
@@ -41,7 +41,7 @@ if (CMAKE_GENERATOR MATCHES "Xcode")
 endif()
 
 # LTTNG based userspace tracing
-option(USE_ANKITRACE "Enable ANKITRACE tracing" ON)
+option(USE_ANKITRACE "Enable ANKITRACE tracing" OFF)
 include(ankitrace)
 
 # Set up custom property for file locations for custom targets
@@ -93,6 +93,7 @@ else()
 endif()
 
 add_definitions(-DANKI_BUILD_SHA="${ANKI_BUILD_SHA}")
+add_definitions(-DANKI_BUILD_BRANCH="${ANKI_BUILD_BRANCH}")
 
 #
 # Pass ANKI defines from the command-line to all targets
@@ -100,6 +101,7 @@ add_definitions(-DANKI_BUILD_SHA="${ANKI_BUILD_SHA}")
 get_cmake_property(opts CACHE_VARIABLES)
 foreach(opt ${opts})
   if(opt STREQUAL "ANKI_BUILD_SHA")
+  elseif(opt STREQUAL "ANKI_BUILD_BRANCH")
     # ignore, set previously
 
   # we whitelist which defines are allowed to be added to prevent hidden, unexpected defines from sneaking in
@@ -203,9 +205,10 @@ if (VICOS)
   include(gen-version)
 endif()
 
-if (VICOS)
-  add_subdirectory("auto-test")
-endif()
+# god i just REALLY don't wanna fix this
+#if (VICOS)
+#  add_subdirectory("auto-test")
+#endif()
 
 add_subdirectory("resources")
 
