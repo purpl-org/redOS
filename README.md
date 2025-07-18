@@ -1,42 +1,18 @@
-<<<<<<< HEAD
-# redOS
+# redOS - /anki folder
 
-Welcome to `redOS`. This is the home of the Anki Vector robot's source code. Original README: [README-orig.md](/README-orig.md)
-=======
-# WireOS - /anki folder
+**This is where the personality code for redOS exists.**
 
-**This is where the personality code for WireOS exists.**
->>>>>>> 12c2d22f5859b94902afdaae3f1bdf1ad5f2399d
+For the entire OS, check out the [redOS-oelinux](https://github.com/purpl-org/redOS-oelinux) repo. This repo, `redOS`, is a submodule of that, and just builds the /anki folder which goes into that OS. However, `redOS` can still be built standalone and deployed to a robot which is running a good base OTA. This is recommended for developers.
 
-For the entire OS, check out the [wire-os](https://github.com/os-vector/wire-os) repo. This repo, `wire-os-victor`, is a submodule of that, and just builds the /anki folder which goes into that OS. However, `wire-os-victor` can still be built standalone and deployed to a robot which is running a good base OTA. This is recommended for developers.
-
-<<<<<<< HEAD
-<<<<<<< HEAD
-## Building (Linux)
-=======
-## Changes
-=======
 Most changes happen in this repo. If one wants to, for instance, add a new feature; this is where they'd do it.
->>>>>>> 12c2d22f5859b94902afdaae3f1bdf1ad5f2399d
 
-If you want to add a program to the OS, do that in [wire-os](https://github.com/os-vector/wire-os).
+If you want to add a program to the OS, do that in [redOS-oelinux](https://github.com/purpl-org/redOS-oelinux).
 
-<<<<<<< HEAD
-## Building (x86_64/arm64 Linux)
->>>>>>> 262a0c28e28c124da9029031715d24040d30a45a
-=======
 Check [vector-docs](https://os-vector.github.io/vector-docs) for more information about the source code leak, what we can do with this, and general Vector info.
->>>>>>> 12c2d22f5859b94902afdaae3f1bdf1ad5f2399d
-
-## What is WireOS?
-
-WireOS serves as a stable, up-to-date, easily-buildable base for CFW, and is a continuation of Anki's work.
-
-Any feature added here should be somewhat objectively applicable to other CFW. Feel free to make a PR. Wire encourages PRs which add things like 3rd-party library upgrades, new behaviors which Anki might have planned to add, code documentation, and optimizations. Wire discourages PRs which significantly alter the experience, like transforming him into a (soulless) GPT box or making him into Cozmo. If you want to do something like that, make your own CFW (instructions in [vector-docs](https://os-vector.github.io/vector-docs)).
 
 ## Building
 
-`wire-os-victor` can be built standalone on most Linux distros (arm64 or amd64), and on macOS (arm64 only, for now).
+`redOS` can be built standalone on most Linux distros (arm64 or amd64), and on macOS (arm64 only, for now).
 
 Docker is recommended for now (especially if you have a weird or old Linux distro installed), though bare metal works nicely too.
 
@@ -96,8 +72,8 @@ sudo dnf install -y git wget curl openssl ninja-build gcc gcc-c++ pkgconf-pkg-co
 
 ```
 cd ~
-git clone --recurse-submodules https://github.com/os-vector/wire-os-victor
-cd wire-os-victor
+git clone --recurse-submodules https://github.com/purpl-org/redOS
+cd redOS
 ```
 
 2. Source `setenv.sh`:
@@ -129,15 +105,8 @@ vbuild
 
 ```
 cd ~
-<<<<<<< HEAD
-git clone --recurse-submodules https://github.com/purpl-org/redOS -b snowboy
-cd redOS
-git lfs install
-git lfs pull
-=======
-git clone --recurse-submodules https://github.com/os-vector/wire-os-victor
+git clone --recurse-submodules https://github.com/purpl-org/redOS
 cd victor
->>>>>>> 12c2d22f5859b94902afdaae3f1bdf1ad5f2399d
 ```
 
 2. Run the build script:
@@ -150,10 +119,7 @@ cd ~/redOS
 
 ## Deploying
 
-<<<<<<< HEAD
-1. Echo your robot's IP address to robot_ip.txt (in the root of the redOS repo):
-=======
-1. Install WireOS on your robot.
+1. Install redOS on your robot.
 2. Get your robot's IP through CCIS:
   - 1. Place your robot on the charger
   - 2. Double click the button
@@ -167,7 +133,6 @@ cd ~/redOS
 <br \>
 
 - Run:
->>>>>>> 12c2d22f5859b94902afdaae3f1bdf1ad5f2399d
 
 ```
 ./build/deploy-v.sh
