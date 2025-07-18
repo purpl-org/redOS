@@ -306,9 +306,6 @@ softdouble cos(const softdouble& a) { return f64_cos(a); }
 | The values to return on conversions to 32-bit integer formats that raise an
 | invalid exception.
 *----------------------------------------------------------------------------*/
-#define ui32_fromPosOverflow 0xFFFFFFFF
-#define ui32_fromNegOverflow 0
-#define ui32_fromNaN         0xFFFFFFFF
 #define i32_fromPosOverflow  0x7FFFFFFF
 #define i32_fromNegOverflow  (-0x7FFFFFFF - 1)
 #define i32_fromNaN          0x7FFFFFFF
@@ -317,9 +314,6 @@ softdouble cos(const softdouble& a) { return f64_cos(a); }
 | The values to return on conversions to 64-bit integer formats that raise an
 | invalid exception.
 *----------------------------------------------------------------------------*/
-#define ui64_fromPosOverflow UINT64_C( 0xFFFFFFFFFFFFFFFF )
-#define ui64_fromNegOverflow 0
-#define ui64_fromNaN         UINT64_C( 0xFFFFFFFFFFFFFFFF )
 #define i64_fromPosOverflow  UINT64_C( 0x7FFFFFFFFFFFFFFF )
 //fixed unsigned unary minus: -x == ~x + 1
 //#define i64_fromNegOverflow (-UINT64_C( 0x7FFFFFFFFFFFFFFF ) - 1)
@@ -420,34 +414,6 @@ struct uint128_extra { uint64_t extra; struct uint128 v; };
 struct uint128 { uint64_t v64, v0; };
 struct uint64_extra { uint64_t v, extra; };
 struct uint128_extra { struct uint128 v; uint64_t extra; };
-#endif
-
-/*----------------------------------------------------------------------------
-| These macros are used to isolate the differences in word order between big-
-| endian and little-endian platforms.
-*----------------------------------------------------------------------------*/
-#ifndef WORDS_BIGENDIAN
-#define wordIncr 1
-#define indexWord( total, n ) (n)
-#define indexWordHi( total ) ((total) - 1)
-#define indexWordLo( total ) 0
-#define indexMultiword( total, m, n ) (n)
-#define indexMultiwordHi( total, n ) ((total) - (n))
-#define indexMultiwordLo( total, n ) 0
-#define indexMultiwordHiBut( total, n ) (n)
-#define indexMultiwordLoBut( total, n ) 0
-#define INIT_UINTM4( v3, v2, v1, v0 ) { v0, v1, v2, v3 }
-#else
-#define wordIncr -1
-#define indexWord( total, n ) ((total) - 1 - (n))
-#define indexWordHi( total ) 0
-#define indexWordLo( total ) ((total) - 1)
-#define indexMultiword( total, m, n ) ((total) - 1 - (m))
-#define indexMultiwordHi( total, n ) 0
-#define indexMultiwordLo( total, n ) ((total) - (n))
-#define indexMultiwordHiBut( total, n ) 0
-#define indexMultiwordLoBut( total, n ) (n)
-#define INIT_UINTM4( v3, v2, v1, v0 ) { v3, v2, v1, v0 }
 #endif
 
 enum {
@@ -1098,6 +1064,7 @@ static float32_t f32_roundToInt( float32_t a, uint_fast8_t roundingMode, bool ex
         switch ( roundingMode ) {
          case round_near_even:
             if ( ! fracF32UI( uiA ) ) break;
+            /* fallthrough */
          case round_near_maxMag:
             if ( exp == 0x7E ) uiZ |= packToF32UI( 0, 0x7F, 0 );
             break;
@@ -1805,6 +1772,7 @@ static float64_t f64_roundToInt( float64_t a, uint_fast8_t roundingMode, bool ex
         switch ( roundingMode ) {
          case round_near_even:
             if ( ! fracF64UI( uiA ) ) break;
+            /* fallthrough */
          case round_near_maxMag:
             if ( exp == 0x3FE ) uiZ |= packToF64UI( 0, 0x3FF, 0 );
             break;
@@ -2063,13 +2031,17 @@ static int_fast64_t f64_to_i64(float64_t a, uint_fast8_t roundingMode, bool exac
     if (exp) sig |= UINT64_C(0x0010000000000000);
     shiftDist = 0x433 - exp;
     if (shiftDist <= 0) {
-        uint_fast64_t z = sig << -shiftDist;
-        if ((shiftDist < -11) || (z & UINT64_C(0x8000000000000000)))
+        bool isValid = shiftDist >= -11;
+        if (isValid)
         {
-            raiseFlags(flag_invalid);
-            return sign ? i64_fromNegOverflow : i64_fromPosOverflow;
+            uint_fast64_t z = sig << -shiftDist;
+            if (0 == (z & UINT64_C(0x8000000000000000)))
+            {
+                return sign ? -(int_fast64_t)z : (int_fast64_t)z;
+            }
         }
-        return sign ? -(int_fast64_t)z : (int_fast64_t)z;
+        raiseFlags(flag_invalid);
+        return sign ? i64_fromNegOverflow : i64_fromPosOverflow;
     }
     else {
         if (shiftDist < 64)

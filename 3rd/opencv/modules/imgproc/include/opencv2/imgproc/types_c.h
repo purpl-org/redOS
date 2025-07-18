@@ -376,8 +376,9 @@ enum
 /** ... and other image warping flags */
 enum
 {
-    CV_WARP_FILL_OUTLIERS =8,
-    CV_WARP_INVERSE_MAP  =16
+    CV_WARP_FILL_OUTLIERS = 8,
+    CV_WARP_INVERSE_MAP   = 16,
+    CV_WARP_RELATIVE_MAP  = 32
 };
 
 /** Shapes of a structuring element for morphological operations
@@ -388,6 +389,7 @@ enum MorphShapes_c
     CV_SHAPE_RECT      =0,
     CV_SHAPE_CROSS     =1,
     CV_SHAPE_ELLIPSE   =2,
+    CV_SHAPE_DIAMOND   =3,
     CV_SHAPE_CUSTOM    =100 //!< custom structuring element
 };
 
@@ -410,7 +412,7 @@ typedef struct CvMoments
     double  mu20, mu11, mu02, mu30, mu21, mu12, mu03; /**< central moments */
     double  inv_sqrt_m00; /**< m00 != 0 ? 1/sqrt(m00) : 0 */
 
-#ifdef __cplusplus
+#if defined(CV__ENABLE_C_API_CTORS) && defined(__cplusplus)
     CvMoments(){}
     CvMoments(const cv::Moments& m)
     {
@@ -429,6 +431,36 @@ typedef struct CvMoments
 #endif
 }
 CvMoments;
+
+#ifdef __cplusplus
+} // extern "C"
+
+CV_INLINE CvMoments cvMoments()
+{
+#if !defined(CV__ENABLE_C_API_CTORS)
+    CvMoments self = CV_STRUCT_INITIALIZER; return self;
+#else
+    return CvMoments();
+#endif
+}
+
+CV_INLINE CvMoments cvMoments(const cv::Moments& m)
+{
+#if !defined(CV__ENABLE_C_API_CTORS)
+    double am00 = std::abs(m.m00);
+    CvMoments self = {
+        m.m00, m.m10, m.m01, m.m20, m.m11, m.m02, m.m30, m.m21, m.m12, m.m03,
+        m.mu20, m.mu11, m.mu02, m.mu30, m.mu21, m.mu12, m.mu03,
+        am00 > DBL_EPSILON ? 1./std::sqrt(am00) : 0
+    };
+    return self;
+#else
+    return CvMoments(m);
+#endif
+}
+
+extern "C" {
+#endif // __cplusplus
 
 /** Hu invariants */
 typedef struct CvHuMoments
@@ -579,9 +611,11 @@ enum
     CV_THRESH_MASK        =7,
     CV_THRESH_OTSU        =8, /**< use Otsu algorithm to choose the optimal threshold value;
                                  combine the flag with one of the above CV_THRESH_* values */
-    CV_THRESH_TRIANGLE    =16  /**< use Triangle algorithm to choose the optimal threshold value;
+    CV_THRESH_TRIANGLE    =16,  /**< use Triangle algorithm to choose the optimal threshold value;
                                  combine the flag with one of the above CV_THRESH_* values, but not
                                  with CV_THRESH_OTSU */
+    CV_THRESH_DRYRUN      =128 /**< compute threshold only (useful for OTSU/TRIANGLE) but does not
+                                  actually run thresholding */
 };
 
 /** Adaptive threshold methods */

@@ -1,12 +1,11 @@
+// This file is part of OpenCV project.
+// It is subject to the license terms in the LICENSE file found in the top-level directory
+// of this distribution and at http://opencv.org/license.html.
 #include "perf_precomp.hpp"
 
-using namespace std;
-using namespace cv;
-using namespace perf;
-using std::tr1::make_tuple;
-using std::tr1::get;
+namespace opencv_test {
 
-typedef std::tr1::tuple<string, int, double, int, int, bool> Image_MaxCorners_QualityLevel_MinDistance_BlockSize_gradientSize_UseHarris_t;
+typedef tuple<string, int, double, int, int, bool> Image_MaxCorners_QualityLevel_MinDistance_BlockSize_gradientSize_UseHarris_t;
 typedef perf::TestBaseWithParam<Image_MaxCorners_QualityLevel_MinDistance_BlockSize_gradientSize_UseHarris_t> Image_MaxCorners_QualityLevel_MinDistance_BlockSize_gradientSize_UseHarris;
 
 PERF_TEST_P(Image_MaxCorners_QualityLevel_MinDistance_BlockSize_gradientSize_UseHarris, goodFeaturesToTrack,
@@ -41,3 +40,38 @@ PERF_TEST_P(Image_MaxCorners_QualityLevel_MinDistance_BlockSize_gradientSize_Use
 
     SANITY_CHECK(corners);
 }
+
+PERF_TEST_P(Image_MaxCorners_QualityLevel_MinDistance_BlockSize_gradientSize_UseHarris, goodFeaturesToTrackWithQuality,
+            testing::Combine(
+                    testing::Values( "stitching/a1.png", "cv/shared/pic5.png"),
+                    testing::Values( 50 ),
+                    testing::Values( 0.01 ),
+                    testing::Values( 3 ),
+                    testing::Values( 3 ),
+                    testing::Bool()
+            )
+)
+{
+    string filename = getDataPath(get<0>(GetParam()));
+    int maxCorners = get<1>(GetParam());
+    double qualityLevel = get<2>(GetParam());
+    int blockSize = get<3>(GetParam());
+    int gradientSize = get<4>(GetParam());
+    bool useHarrisDetector = get<5>(GetParam());
+    double minDistance = 1;
+
+    Mat image = imread(filename, IMREAD_GRAYSCALE);
+    if (image.empty())
+        FAIL() << "Unable to load source image" << filename;
+
+    std::vector<Point2f> corners;
+    std::vector<float> cornersQuality;
+
+    TEST_CYCLE() goodFeaturesToTrack(image, corners, maxCorners, qualityLevel, minDistance, noArray(),
+                                     cornersQuality, blockSize, gradientSize, useHarrisDetector);
+
+    SANITY_CHECK(corners);
+    SANITY_CHECK(cornersQuality, 1e-6);
+}
+
+} // namespace

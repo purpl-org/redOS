@@ -42,10 +42,8 @@
 
 #include "test_precomp.hpp"
 
-using namespace cv;
+namespace opencv_test { namespace {
 
-namespace cvtest
-{
     class CV_BilateralFilterTest :
         public cvtest::BaseTest
     {
@@ -112,10 +110,12 @@ namespace cvtest
             src.type() == dst.type() && src.size() == dst.size() &&
             src.data != dst.data );
 
-        if( sigma_color <= 0 )
-            sigma_color = 1;
-        if( sigma_space <= 0 )
-            sigma_space = 1;
+        constexpr double eps = 1e-6;
+        if( sigma_color <= eps || sigma_space <= eps )
+        {
+            src.copyTo(dst);
+            return;
+        }
 
         double gauss_color_coeff = -0.5/(sigma_color*sigma_color);
         double gauss_space_coeff = -0.5/(sigma_space*sigma_space);
@@ -128,7 +128,8 @@ namespace cvtest
         d = radius*2 + 1;
         // compute the min/max range for the input image (even if multichannel)
 
-        minMaxLoc( src.reshape(1), &minValSrc, &maxValSrc );
+        // TODO cvtest
+        cv::minMaxLoc( src.reshape(1), &minValSrc, &maxValSrc );
         if(std::abs(minValSrc - maxValSrc) < FLT_EPSILON)
         {
             src.copyTo(dst);
@@ -137,8 +138,8 @@ namespace cvtest
 
         // temporary copy of the image with borders for easy processing
         Mat temp;
-        copyMakeBorder( src, temp, radius, radius, radius, radius, borderType );
-        patchNaNs(temp);
+        cv::copyMakeBorder( src, temp, radius, radius, radius, radius, borderType );
+        cv::patchNaNs(temp);
 
         // allocate lookup tables
         vector<float> _space_weight(d*d);
@@ -204,7 +205,7 @@ namespace cvtest
             }
             else
             {
-                assert( cn == 3 );
+                CV_Assert( cn == 3 );
                 for( j = 0; j < size.width*3; j += 3 )
                 {
                     float sum_b = 0, sum_g = 0, sum_r = 0, wsum = 0;
@@ -244,7 +245,7 @@ namespace cvtest
 
         rng.fill(_src, RNG::UNIFORM, 0, 256);
 
-        _sigma_color = _sigma_space = 1.;
+        _sigma_color = _sigma_space = rng.uniform(0., 10.);
 
         return 1;
     }
@@ -290,4 +291,4 @@ namespace cvtest
         test.safe_run();
     }
 
-} // end of namespace cvtest
+}} // namespace

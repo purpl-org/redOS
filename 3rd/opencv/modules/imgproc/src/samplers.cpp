@@ -74,7 +74,7 @@ adjustRect( const uchar* src, size_t src_step, int pix_size,
             src += rect.width*pix_size;
             rect.width = 0;
         }
-        assert( rect.width <= win_size.width );
+        CV_Assert( rect.width <= win_size.width );
     }
 
     if( ip.y >= 0 )
@@ -365,7 +365,7 @@ getQuadrangleSubPix_8u32f_CnR( const uchar* src, size_t src_step, Size src_size,
 void cv::getRectSubPix( InputArray _image, Size patchSize, Point2f center,
                        OutputArray _patch, int patchType )
 {
-    CV_INSTRUMENT_REGION()
+    CV_INSTRUMENT_REGION();
 
     Mat image = _image.getMat();
     int depth = image.depth(), cn = image.channels();
@@ -417,7 +417,7 @@ void cv::getRectSubPix( InputArray _image, Size patchSize, Point2f center,
         getRectSubPix_Cn_<float, float, float, nop<float>, nop<float> >
         (image.ptr<float>(), image.step, image.size(), patch.ptr<float>(), patch.step, patch.size(), center, cn);
     else
-        CV_Error( CV_StsUnsupportedFormat, "Unsupported combination of input and output formats");
+        CV_Error( cv::Error::StsUnsupportedFormat, "Unsupported combination of input and output formats");
 }
 
 
@@ -473,7 +473,7 @@ cvSampleLine( const void* _img, CvPoint pt1, CvPoint pt2,
     size_t pixsize = img.elemSize();
 
     if( !buffer )
-        CV_Error( CV_StsNullPtr, "" );
+        CV_Error( cv::Error::StsNullPtr, "" );
 
     for( int i = 0; i < li.count; i++, ++li )
     {

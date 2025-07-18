@@ -126,7 +126,7 @@ int cornerScore<16>(const uchar* ptr, const int pixel[], int threshold)
         d[k] = (short)(v - ptr[pixel[k]]);
 
 #if CV_SIMD128
-    if (hasSIMD128())
+    if (true)
     {
         v_int16x8 q0 = v_setall_s16(-1000), q1 = v_setall_s16(1000);
         for (k = 0; k < 16; k += 8)
@@ -160,7 +160,7 @@ int cornerScore<16>(const uchar* ptr, const int pixel[], int threshold)
             q0 = v_max(q0, v_min(a, v0));
             q1 = v_min(q1, v_max(b, v0));
         }
-        q0 = v_max(q0, v_setzero_s16() - q1);
+        q0 = v_max(q0, v_sub(v_setzero_s16(), q1));
         threshold = v_reduce_max(q0) - 1;
     }
     else
@@ -223,7 +223,7 @@ int cornerScore<12>(const uchar* ptr, const int pixel[], int threshold)
 #endif
 
 #if CV_SIMD128
-    if (hasSIMD128())
+    if (true)
     {
         v_int16x8 q0 = v_setall_s16(-1000), q1 = v_setall_s16(1000);
         for (k = 0; k < 16; k += 8)
@@ -251,7 +251,7 @@ int cornerScore<12>(const uchar* ptr, const int pixel[], int threshold)
             q0 = v_max(q0, v_min(a, v0));
             q1 = v_min(q1, v_max(b, v0));
         }
-        q0 = v_max(q0, v_setzero_s16() - q1);
+        q0 = v_max(q0, v_sub(v_setzero_s16(), q1));
         threshold = v_reduce_max(q0) - 1;
     }
     else
@@ -303,8 +303,9 @@ int cornerScore<8>(const uchar* ptr, const int pixel[], int threshold)
     for (k = 0; k < N; k++)
         d[k] = (short)(v - ptr[pixel[k]]);
 
-#if CV_SIMD128
-    if (hasSIMD128())
+#if CV_SIMD128 \
+    && (!defined(CV_SIMD128_CPP) || (!defined(__GNUC__) || __GNUC__ != 5))  // "movdqa" bug on "v_load(d + 1)" line (Ubuntu 16.04 + GCC 5.4)
+    if (true)
     {
         v_int16x8 v0 = v_load(d + 1);
         v_int16x8 v1 = v_load(d + 2);
@@ -322,7 +323,7 @@ int cornerScore<8>(const uchar* ptr, const int pixel[], int threshold)
         v0 = v_load(d + 5);
         q0 = v_max(q0, v_min(a, v0));
         q1 = v_min(q1, v_max(b, v0));
-        q0 = v_max(q0, v_setzero_s16() - q1);
+        q0 = v_max(q0, v_sub(v_setzero_s16(), q1));
         threshold = v_reduce_max(q0) - 1;
     }
     else

@@ -5,12 +5,8 @@
 #ifndef __OPENCV_TEST_INVARIANCE_UTILS_HPP__
 #define __OPENCV_TEST_INVARIANCE_UTILS_HPP__
 
-#include "test_precomp.hpp"
+namespace opencv_test { namespace {
 
-using namespace std;
-using namespace cv;
-
-static
 Mat generateHomography(float angle)
 {
     // angle - rotation around Oz in degrees
@@ -23,7 +19,6 @@ Mat generateHomography(float angle)
     return H;
 }
 
-static
 Mat rotateImage(const Mat& srcImage, const Mat& srcMask, float angle, Mat& dstImage, Mat& dstMask)
 {
     // angle - rotation around Oz in degrees
@@ -43,10 +38,9 @@ Mat rotateImage(const Mat& srcImage, const Mat& srcMask, float angle, Mat& dstIm
     return H;
 }
 
-static
 float calcCirclesIntersectArea(const Point2f& p0, float r0, const Point2f& p1, float r1)
 {
-    float c = static_cast<float>(norm(p0 - p1)), sqr_c = c * c;
+    float c = static_cast<float>(cv::norm(p0 - p1)), sqr_c = c * c;
 
     float sqr_r0 = r0 * r0;
     float sqr_r1 = r1 * r1;
@@ -69,7 +63,6 @@ float calcCirclesIntersectArea(const Point2f& p0, float r0, const Point2f& p1, f
             0.5f * sqr_r1 * (A1 - sin(A1));
 }
 
-static
 float calcIntersectRatio(const Point2f& p0, float r0, const Point2f& p1, float r1)
 {
     float intersectArea = calcCirclesIntersectArea(p0, r0, p1, r1);
@@ -77,16 +70,16 @@ float calcIntersectRatio(const Point2f& p0, float r0, const Point2f& p1, float r
     return intersectArea / unionArea;
 }
 
-static
 void scaleKeyPoints(const vector<KeyPoint>& src, vector<KeyPoint>& dst, float scale)
 {
     dst.resize(src.size());
     for (size_t i = 0; i < src.size(); i++) {
         dst[i] = src[i];
-        dst[i].pt.x *= scale;
-        dst[i].pt.y *= scale;
+        dst[i].pt.x = dst[i].pt.x * scale + (scale - 1.0f) / 2.0f;
+        dst[i].pt.y = dst[i].pt.y * scale + (scale - 1.0f) / 2.0f;
         dst[i].size *= scale;
     }
 }
 
+}} // namespace
 #endif // __OPENCV_TEST_INVARIANCE_UTILS_HPP__

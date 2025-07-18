@@ -57,6 +57,7 @@
     ==========================================================================
 */
 #include "precomp.hpp"
+#include "opencv2/imgproc/detail/legacy.hpp"
 
 #define MAX_ITERATIONS 500
 #define CV_EMD_INF   ((float)1e20)
@@ -174,28 +175,28 @@ CV_IMPL float cvCalcEMD2( const CvArr* signature_arr1,
     signature2 = cvGetMat( signature2, &sign_stub2 );
 
     if( signature1->cols != signature2->cols )
-        CV_Error( CV_StsUnmatchedSizes, "The arrays must have equal number of columns (which is number of dimensions but 1)" );
+        CV_Error( cv::Error::StsUnmatchedSizes, "The arrays must have equal number of columns (which is number of dimensions but 1)" );
 
     dims = signature1->cols - 1;
     size1 = signature1->rows;
     size2 = signature2->rows;
 
     if( !CV_ARE_TYPES_EQ( signature1, signature2 ))
-        CV_Error( CV_StsUnmatchedFormats, "The array must have equal types" );
+        CV_Error( cv::Error::StsUnmatchedFormats, "The array must have equal types" );
 
     if( CV_MAT_TYPE( signature1->type ) != CV_32FC1 )
-        CV_Error( CV_StsUnsupportedFormat, "The signatures must be 32fC1" );
+        CV_Error( cv::Error::StsUnsupportedFormat, "The signatures must be 32fC1" );
 
     if( flow )
     {
         flow = cvGetMat( flow, &flow_stub );
 
         if( flow->rows != size1 || flow->cols != size2 )
-            CV_Error( CV_StsUnmatchedSizes,
+            CV_Error( cv::Error::StsUnmatchedSizes,
             "The flow matrix size does not match to the signatures' sizes" );
 
         if( CV_MAT_TYPE( flow->type ) != CV_32FC1 )
-            CV_Error( CV_StsUnsupportedFormat, "The flow matrix must be 32fC1" );
+            CV_Error( cv::Error::StsUnsupportedFormat, "The flow matrix must be 32fC1" );
     }
 
     cost->data.fl = 0;
@@ -206,43 +207,43 @@ CV_IMPL float cvCalcEMD2( const CvArr* signature_arr1,
         if( cost_matrix )
         {
             if( dist_func )
-                CV_Error( CV_StsBadArg,
+                CV_Error( cv::Error::StsBadArg,
                 "Only one of cost matrix or distance function should be non-NULL in case of user-defined distance" );
 
             if( lower_bound )
-                CV_Error( CV_StsBadArg,
+                CV_Error( cv::Error::StsBadArg,
                 "The lower boundary can not be calculated if the cost matrix is used" );
 
             cost = cvGetMat( cost_matrix, &cost_stub );
             if( cost->rows != size1 || cost->cols != size2 )
-                CV_Error( CV_StsUnmatchedSizes,
+                CV_Error( cv::Error::StsUnmatchedSizes,
                 "The cost matrix size does not match to the signatures' sizes" );
 
             if( CV_MAT_TYPE( cost->type ) != CV_32FC1 )
-                CV_Error( CV_StsUnsupportedFormat, "The cost matrix must be 32fC1" );
+                CV_Error( cv::Error::StsUnsupportedFormat, "The cost matrix must be 32fC1" );
         }
         else if( !dist_func )
-            CV_Error( CV_StsNullPtr, "In case of user-defined distance Distance function is undefined" );
+            CV_Error( cv::Error::StsNullPtr, "In case of user-defined distance Distance function is undefined" );
     }
     else
     {
         if( dims == 0 )
-            CV_Error( CV_StsBadSize,
+            CV_Error( cv::Error::StsBadSize,
             "Number of dimensions can be 0 only if a user-defined metric is used" );
         user_param = (void *) (size_t)dims;
         switch (dist_type)
         {
-        case CV_DIST_L1:
+        case cv::DIST_L1:
             dist_func = icvDistL1;
             break;
-        case CV_DIST_L2:
+        case cv::DIST_L2:
             dist_func = icvDistL2;
             break;
-        case CV_DIST_C:
+        case cv::DIST_C:
             dist_func = icvDistC;
             break;
         default:
-            CV_Error( CV_StsBadFlag, "Bad or unsupported metric type" );
+            CV_Error( cv::Error::StsBadFlag, "Bad or unsupported metric type" );
         }
     }
 
@@ -279,7 +280,7 @@ CV_IMPL float cvCalcEMD2( const CvArr* signature_arr1,
                                       state.ssize, state.dsize, state.enter_x );
 
             if( min_delta == CV_EMD_INF )
-                CV_Error( CV_StsNoConv, "" );
+                CV_Error( cv::Error::StsNoConv, "" );
 
             /* if no negative deltamin, we found the optimal solution */
             if( min_delta >= -eps )
@@ -287,7 +288,7 @@ CV_IMPL float cvCalcEMD2( const CvArr* signature_arr1,
 
             /* improve solution */
             if(!icvNewSolution( &state ))
-                CV_Error( CV_StsNoConv, "" );
+                CV_Error( cv::Error::StsNoConv, "" );
         }
     }
 
@@ -336,7 +337,7 @@ static int icvInitEMD( const float* signature1, int size1,
     char *buffer, *buffer_end;
 
     memset( state, 0, sizeof( *state ));
-    assert( cost_step % sizeof(float) == 0 );
+    CV_Assert( cost_step % sizeof(float) == 0 );
     cost_step /= sizeof(float);
 
     /* calculate buffer size */
@@ -359,7 +360,7 @@ static int icvInitEMD( const float* signature1, int size1,
     /* allocate buffers */
     _buffer.allocate(buffer_size);
 
-    state->buffer = buffer = _buffer;
+    state->buffer = buffer = _buffer.data();
     buffer_end = buffer + buffer_size;
 
     state->idx1 = (int*) buffer;
@@ -387,7 +388,7 @@ static int icvInitEMD( const float* signature1, int size1,
 
         }
         else if( weight < 0 )
-            CV_Error(CV_StsBadArg, "signature1 must not contain negative weights");
+            CV_Error(cv::Error::StsBadArg, "signature1 must not contain negative weights");
     }
 
     for( i = 0; i < size2; i++ )
@@ -401,13 +402,13 @@ static int icvInitEMD( const float* signature1, int size1,
             state->idx2[dsize++] = i;
         }
         else if( weight < 0 )
-            CV_Error(CV_StsBadArg, "signature2 must not contain negative weights");
+            CV_Error(cv::Error::StsBadArg, "signature2 must not contain negative weights");
     }
 
     if( ssize == 0 )
-        CV_Error(CV_StsBadArg, "signature1 must contain at least one non-zero value");
+        CV_Error(cv::Error::StsBadArg, "signature1 must contain at least one non-zero value");
     if( dsize == 0 )
-        CV_Error(CV_StsBadArg, "signature2 must contain at least one non-zero value");
+        CV_Error(cv::Error::StsBadArg, "signature2 must contain at least one non-zero value");
 
     /* if supply different than the demand, add a zero-cost dummy cluster */
     diff = s_sum - d_sum;
@@ -510,7 +511,7 @@ static int icvInitEMD( const float* signature1, int size1,
                     }
                     else
                     {
-                        assert( cost );
+                        CV_Assert( cost );
                         val = cost[cost_step*ci + cj];
                     }
                     state->cost[i][j] = val;
@@ -552,7 +553,7 @@ static int icvInitEMD( const float* signature1, int size1,
         buffer += dsize;
     }
 
-    assert( buffer <= buffer_end );
+    CV_Assert( buffer <= buffer_end );
 
     icvRussel( state );
 
@@ -1147,31 +1148,31 @@ icvDistC( const float *x, const float *y, void *user_param )
 }
 
 
-float cv::EMD( InputArray _signature1, InputArray _signature2,
+float cv::EMD_legacy( InputArray _signature1, InputArray _signature2,
                int distType, InputArray _cost,
                float* lowerBound, OutputArray _flow )
 {
-    CV_INSTRUMENT_REGION()
+    CV_INSTRUMENT_REGION();
 
     Mat signature1 = _signature1.getMat(), signature2 = _signature2.getMat();
     Mat cost = _cost.getMat(), flow;
 
-    CvMat _csignature1 = signature1;
-    CvMat _csignature2 = signature2;
-    CvMat _ccost = cost, _cflow;
+    CvMat _csignature1 = cvMat(signature1);
+    CvMat _csignature2 = cvMat(signature2);
+    CvMat _ccost = cvMat(cost), _cflow;
     if( _flow.needed() )
     {
         _flow.create(signature1.rows, signature2.rows, CV_32F);
         flow = _flow.getMat();
         flow = Scalar::all(0);
-        _cflow = flow;
+        _cflow = cvMat(flow);
     }
 
     return cvCalcEMD2( &_csignature1, &_csignature2, distType, 0, cost.empty() ? 0 : &_ccost,
                        _flow.needed() ? &_cflow : 0, lowerBound, 0 );
 }
 
-float cv::wrapperEMD(InputArray _signature1, InputArray _signature2,
+float cv::wrapperEMD_legacy(InputArray _signature1, InputArray _signature2,
                int distType, InputArray _cost,
                Ptr<float> lowerBound, OutputArray _flow)
 {

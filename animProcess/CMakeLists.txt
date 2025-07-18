@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.6)
+cmake_minimum_required(VERSION 3.10)
 
 project(animProcess)
 
@@ -55,7 +55,7 @@ target_link_libraries(victor_anim
   micdata
   libev
   # vendor
-  ${PICOVOICE_LIBS}
+  pv_porcupine
   ${OPENCV_LIBS}
   ${FLATBUFFERS_LIBS}
   signal_essence
