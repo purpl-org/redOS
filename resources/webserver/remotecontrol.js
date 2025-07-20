@@ -1,9 +1,5 @@
 //i dont know javascript but im just gonna see what i can do...
 
-function doFunction() {
-    alert('Test');
-}
-
 var el = document.getElementById("remoteControl");
 
 
