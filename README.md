@@ -12,7 +12,13 @@ Check [vector-docs](https://os-vector.github.io/vector-docs) for more informatio
 
 ## Building
 
+<<<<<<< HEAD
 `redOS` can be built standalone on most Linux distros (arm64 or amd64), and on macOS (arm64 only, for now).
+=======
+`wire-os-victor` can be built standalone on most Linux distros (arm64 or amd64).
+
+macOS building used to work, but **doesn't at the moment**. This will be fixed soon. Disregard the macOS instructions for now.
+>>>>>>> 2f43f870679871e61cdb1165715f452608ffbe79
 
 Docker is recommended for now (especially if you have a weird or old Linux distro installed), though bare metal works nicely too.
 
@@ -57,7 +63,7 @@ cd ~/redOS
 <br \>
 
 - Prerequisites:
-  - glibc 2.27 or above - this means anything Ubuntu 18.04 and newer will work.
+  - glibc 2.35 or above - this means anything Debian Bookworm-era and newer will work.
   - The following packages need to be installed: `git wget curl openssl ninja g++ gcc pkg-config ccache`
 ```
 # Arch Linux:
@@ -97,6 +103,8 @@ vbuild
 
 <summary><strong>macOS (M-series only)</strong></summary>
 <br />
+
+# macOS BUILDING IS NOT WORKING AT THE MOMENT. THIS WILL BE FIXED SOON.
 
 - Prereqs: Make sure you have [brew](https://brew.sh/) installed.
   -  Then: `brew install ccache wget upx ninja`
@@ -179,3 +187,10 @@ If you do want to clean anyway:
 vclean
 ```
 </details>
+
+## VSCode Code Completion
+
+- After you build for the first time, two files will be generated and placed in the root of the source directory:
+  - `compile_commands.json`
+  - `.clangd`
+- If you install the [`clangd`](https://marketplace.visualstudio.com/items?itemName=llvm-vs-code-extensions.vscode-clangd) extension for VSCode then relaunch VSCode after a build, it will index the code and you will have speedy code completion, error underlining+explanations, function descriptions, and such for the entire codebase.
