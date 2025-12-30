@@ -12,13 +12,10 @@ Check [vector-docs](https://os-vector.github.io/vector-docs) for more informatio
 
 ## Building
 
-<<<<<<< HEAD
+
 `redOS` can be built standalone on most Linux distros (arm64 or amd64), and on macOS (arm64 only, for now).
-=======
-`wire-os-victor` can be built standalone on most Linux distros (arm64 or amd64).
 
 macOS building used to work, but **doesn't at the moment**. This will be fixed soon. Disregard the macOS instructions for now.
->>>>>>> 2f43f870679871e61cdb1165715f452608ffbe79
 
 Docker is recommended for now (especially if you have a weird or old Linux distro installed), though bare metal works nicely too.
 
