@@ -34,13 +34,8 @@ static const std::unordered_map<uint16_t,std::string> kFaultText = {
   {981,  "Camera process issue (981)."},
 };
 
-<<<<<<< HEAD
 static const char* kSupportURL        = "error.p-2.xyz";
 static const char* kVectorWillRestart = "vector will restart";
-=======
-static const char* kSupportURL        = "error.pvic.xyz";
-static const char* kVectorWillRestart = "Vector will restart.";
->>>>>>> 2f43f870679871e61cdb1165715f452608ffbe79
 
 static constexpr float kHeadScale = 0.7f;
 static constexpr int   kHeadThick = 1;
