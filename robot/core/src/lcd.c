@@ -80,7 +80,7 @@ static const INIT_SCRIPT init_scr_midas[] =
 {
   { 0x01, 0, { 0x00}, 150}, // Software reset
   { 0x11, 0, { 0x00}, 500}, // Sleep out
-  { 0x20, 0, { 0x00}, 0}, // Display inversion off
+  //{ 0x20, 0, { 0x00}, 0}, // Display inversion off
   { 0x36, 1, { 0xA8}, 0}, //exchange rotate and reverse order in each of 2 dim 
   { 0x3A, 1, { 0x05}, 0}, // Interface pixel format (16 bit/pixel 65k RGB data)
 
@@ -90,8 +90,8 @@ static const INIT_SCRIPT init_scr_midas[] =
   { 0xFC, 1, { 128+64}, 0},
 
   { 0x13, 0, { 0x00}, 100}, // Normal Display Mode On
-  // { 0x21, 0, { 0x00 }, 10 }, // Display inversion on
-  // { 0x20, 0, { 0x00 }, 10 }, // Display inversion off
+  { 0x21, 0, { 0x00 }, 10 }, // Display inversion on
+  //{ 0x20, 0, { 0x00 }, 10 }, // Display inversion off
   { 0x26, 1, {0x02} , 10}, // Set Gamma
   { 0x29, 0, { 0x00}, 10}, // Display On
 
